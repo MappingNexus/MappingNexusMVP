@@ -1,48 +1,42 @@
-# Vercel Deployment Guide
+# Vercel Deployment Guide - Frontend Only
 
-## Quick Fix Summary
+## Quick Setup for Frontend-Only Deployment
 
-The build was failing because Vercel didn't know how to handle your monorepo structure. I've added the necessary configuration files:
-
-1. ✅ `vercel.json` - Tells Vercel how to build and route your app
-2. ✅ `api/index.ts` - Serverless function wrapper for your Express backend
-3. ✅ `package.json` - Root build script
-4. ✅ Updated `backend/server.ts` - Works in both local and serverless environments
-5. ✅ Updated CORS settings - Allows your Vercel domain
-
-## What Changed
-
-### 1. Server Configuration
-- Backend now detects Vercel environment and doesn't start listening (serverless)
-- CORS updated to allow your Vercel deployment URL
-
-### 2. Build Process
-- Root `package.json` provides build command
-- `vercel.json` configures the build and routing
-
-### 3. API Routing
-- `/api/*` routes go to your Express backend via serverless functions
-- Everything else serves your React frontend
+You only want to deploy the frontend React app. Here's the simple setup:
 
 ## Next Steps
 
-### 1. Push Changes to GitHub
-```bash
-git add .
-git commit -m "Add Vercel configuration"
-git push
-```
-
-### 2. Configure Vercel Project Settings
+### 1. Configure Vercel Project Settings
 
 In your Vercel dashboard:
 
 **Build Settings:**
-- **Framework Preset**: Other
-- **Root Directory**: `.` (keep as root)
-- **Build Command**: `cd frontend && npm run build` (or leave empty, vercel.json handles it)
-- **Output Directory**: `frontend/dist`
-- **Install Command**: `cd backend && npm install && cd ../frontend && npm install` (or leave empty)
+- **Framework Preset**: `Vite` (Vercel will auto-detect)
+- **Root Directory**: `frontend` ⬅️ **IMPORTANT: Set this to `frontend`**
+- **Build Command**: `npm run build` (or leave empty, Vite preset handles it)
+- **Output Directory**: `dist` (or leave empty, Vite preset handles it)
+- **Install Command**: (leave empty, Vite preset handles it)
+
+**That's it!** Vercel will:
+1. Navigate to `frontend/` directory
+2. Run `npm install`
+3. Run `npm run build`
+4. Serve the `dist/` folder as static site
+
+### 2. Environment Variables (Optional)
+
+If your frontend needs environment variables, add them in Vercel:
+
+**Frontend Environment Variables:**
+- `VITE_GROQ_API_KEY` - Your Groq API key (if needed)
+- `VITE_API_URL` - Your backend API URL (if backend is deployed elsewhere)
+
+**Note:** Vite only exposes variables prefixed with `VITE_` to the frontend.
+
+### 3. Deploy
+
+- Push to your main branch (auto-deploys)
+- Or manually trigger deployment in Vercel dashboard
 
 **Environment Variables:**
 Add these in Project Settings → Environment Variables:
@@ -87,61 +81,54 @@ npm run seed
 
 ## Troubleshooting
 
-### Build Fails with "Cannot find module"
-- Ensure both `backend/node_modules` and `frontend/node_modules` exist
-- Check that `installCommand` in vercel.json runs correctly
+### Build Fails
+- **Check Root Directory**: Must be set to `frontend` (not `.`)
+- **Check Framework**: Should be `Vite` (auto-detected)
+- **Check Build Logs**: Vercel dashboard → Deployments → View logs
 
-### API Returns 404
-- Verify `api/index.ts` exists
-- Check `vercel.json` rewrites configuration
-- Ensure backend dependencies are installed
+### API Calls Fail (404)
+- Your frontend calls `/api/*` but there's no backend deployed
+- **Option 1**: Deploy backend separately and update `VITE_API_URL` env var
+- **Option 2**: Update `frontend/services/api.ts` to use full backend URL
 
-### Database Connection Errors
-- Verify `DATABASE_URL` is set correctly
-- Check database allows external connections
-- Ensure SSL mode: `?sslmode=require`
-
-### CORS Errors
-- Add your Vercel URL to CORS origins (already done)
-- Check `FRONTEND_URL` environment variable
+### Environment Variables Not Working
+- Vite only exposes variables starting with `VITE_`
+- Make sure you prefix them: `VITE_API_URL`, `VITE_GROQ_API_KEY`, etc.
+- Restart deployment after adding env vars
 
 ## File Structure
 
 ```
 MappingNexus/
-├── vercel.json          # Vercel configuration
-├── package.json         # Root build script
-├── api/
-│   └── index.ts        # Serverless function entry point
-├── frontend/           # React app
-│   └── dist/          # Build output (created during build)
-└── backend/            # Express API
-    └── server.ts       # Express app (exported for serverless)
+├── frontend/           # React app (THIS IS YOUR ROOT IN VERCEL)
+│   ├── dist/          # Build output (created during build)
+│   ├── package.json
+│   └── vite.config.ts
+└── backend/           # Express API (NOT DEPLOYED - ignored by Vercel)
+    └── ...
 ```
 
 ## How It Works
 
-1. **Build Phase**: 
-   - Installs backend dependencies
-   - Installs frontend dependencies
-   - Builds frontend to `frontend/dist`
+1. **Vercel Settings**: Root Directory = `frontend`
+2. **Build Phase**: 
+   - Vercel navigates to `frontend/`
+   - Runs `npm install`
+   - Runs `npm run build` (which runs `tsc && vite build`)
+   - Outputs to `frontend/dist/`
 
-2. **Runtime**:
-   - Static files (React app) served from `frontend/dist`
-   - `/api/*` requests routed to `api/index.ts` → Express app
-   - Express app runs as serverless function
-
-3. **Database**:
-   - Prisma Client generated during install (postinstall script)
-   - Migrations run manually after deployment
+3. **Runtime**:
+   - Static files served from `dist/`
+   - All routes serve your React app (SPA)
+   - API calls to `/api/*` will fail unless you deploy backend separately
 
 ## Important Notes
 
-- ⚠️ **Database**: You need a hosted PostgreSQL database (Vercel Postgres, Supabase, Neon, etc.)
-- ⚠️ **Migrations**: Run `prisma migrate deploy` after first deployment
-- ⚠️ **Seeding**: Run `npm run seed` in backend after migrations
+- ✅ **Simple**: Just set Root Directory to `frontend`
+- ✅ **No Backend**: Backend folder is completely ignored
+- ✅ **Static Site**: Pure frontend deployment
+- ⚠️ **API Calls**: If frontend calls `/api/*`, those will 404 unless you deploy backend elsewhere
 - ✅ **Auto-deploy**: Pushing to main branch triggers deployment
-- ✅ **Preview**: Pull requests get preview deployments automatically
 
 ## Testing Deployment
 
