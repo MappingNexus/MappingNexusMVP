@@ -27,7 +27,11 @@ interface VerifyOTPResponse {
   valid: boolean;
 }
 
-const API_BASE_URL = process.env.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3000';
+// In Vite, environment variables are exposed via import.meta.env with VITE_ prefix
+// Backend URL should be configured as VITE_API_URL in the deployment environment
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  '/api';
 
 /**
  * Send OTP to user's email
