@@ -26,9 +26,32 @@ const prisma = new PrismaClient({
 });
 
 // ============ CORS CONFIGURATION ============
-// Allow frontend on both port 3000 and 5173
+// Allow frontend on both port 3000 and 5173, plus production domains
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+];
+
+// Add Vercel deployment URLs if provided
+if (process.env.VERCEL_URL) {
+    allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+}
+if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 const corsOptions = {
-    origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'],
+    origin: function (origin: string | undefined, callback: Function) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow all origins in production for now
+        }
+    },
     credentials: true,
     optionsSuccessStatus: 200,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -707,29 +730,32 @@ async function seedAdmin() {
 
 // ============ SERVER START ============
 
-app.listen(PORT, async () => {
-    console.log(`\n🚀 Backend API Server running on http://localhost:${PORT}`);
-    console.log(`\n⚙️  Configuration:`);
-    console.log(`   - Database: ${isDatabaseConnected ? '✓ Connected' : '✗ NOT CONNECTED'}`);
-    console.log(`   - Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`\n📊 API Endpoints:`);
-    console.log(`   - POST /api/auth/signup`);
-    console.log(`   - POST /api/auth/login`);
-    console.log(`   - GET  /api/employees`);
-    console.log(`   - POST /api/employees`);
-    console.log(`   - DEL  /api/employees/:id`);
-    console.log(`   - POST /api/admin/verify`);
-    console.log(`   - GET  /api/admin/customers`);
-    console.log(`   - POST /api/admin/approve`);
-    console.log(`   - POST /api/admin/revoke`);
-    console.log(`   - GET  /api/admin/revenue`);
-    console.log(`   - GET  /api/admin/transactions`);
-    console.log(`\n`);
+// Only start listening if not in serverless environment (Vercel)
+if (!process.env.VERCEL) {
+    app.listen(PORT, async () => {
+        console.log(`\n🚀 Backend API Server running on http://localhost:${PORT}`);
+        console.log(`\n⚙️  Configuration:`);
+        console.log(`   - Database: ${isDatabaseConnected ? '✓ Connected' : '✗ NOT CONNECTED'}`);
+        console.log(`   - Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`\n📊 API Endpoints:`);
+        console.log(`   - POST /api/auth/signup`);
+        console.log(`   - POST /api/auth/login`);
+        console.log(`   - GET  /api/employees`);
+        console.log(`   - POST /api/employees`);
+        console.log(`   - DEL  /api/employees/:id`);
+        console.log(`   - POST /api/admin/verify`);
+        console.log(`   - GET  /api/admin/customers`);
+        console.log(`   - POST /api/admin/approve`);
+        console.log(`   - POST /api/admin/revoke`);
+        console.log(`   - GET  /api/admin/revenue`);
+        console.log(`   - GET  /api/admin/transactions`);
+        console.log(`\n`);
 
-    // Seed admin on startup
-    if (isDatabaseConnected) {
-        await seedAdmin();
-    }
-});
+        // Seed admin on startup
+        if (isDatabaseConnected) {
+            await seedAdmin();
+        }
+    });
+}
 
 export default app;
