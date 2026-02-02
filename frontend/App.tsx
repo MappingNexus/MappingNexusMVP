@@ -13,6 +13,8 @@ import { AdminAnalytics } from './components/AdminAnalytics';
 import { EnterpriseContact } from './components/EnterpriseContact';
 import { RequestDemo } from './components/RequestDemo';
 import { FounderSection } from './components/FounderSection';
+import { HeroSection } from './components/HeroSection';
+import { FaqSection } from './components/FaqSection';
 import { Activity } from 'lucide-react';
 import { Employee, CustomerRecord, Transaction } from './types';
 import * as api from './services/api';
@@ -34,6 +36,22 @@ interface UserState {
 const TEMP_BYPASS_LOGIN = true;
 
 const App: React.FC = () => {
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Toggle Theme Effect
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    setIsDarkMode(prev => !prev);
+  };
+
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isMapping, setIsMapping] = useState(false);
@@ -283,12 +301,14 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#121212] text-zinc-900 dark:text-white flex flex-col font-sans transition-colors duration-300">
       <Navbar
         onLoginClick={() => setCurrentPage('login')}
         onHomeClick={() => setCurrentPage('home')}
         onRequestDemoClick={() => setCurrentPage('demo')}
         currentPage={currentPage}
+        isDarkMode={isDarkMode}
+        toggleTheme={toggleTheme}
       />
 
       {isMapping && <MappingLoader onComplete={handleMappingComplete} />}
@@ -306,48 +326,7 @@ const App: React.FC = () => {
       <main className="flex-grow">
         {currentPage === 'home' && (
           <>
-            <div className="bg-[#121212] w-full text-white border-b border-zinc-800">
-              <section className="py-16 sm:py-24 md:py-32 px-4 sm:px-6 max-w-7xl mx-auto text-center">
-                <style>{`
-                  @keyframes slideDownFade {
-                    from { opacity: 0; transform: translateY(-30px); }
-                    to { opacity: 1; transform: translateY(0); }
-                  }
-                  @keyframes slideUpFade {
-                    from { opacity: 0; transform: translateY(30px); }
-                    to { opacity: 1; transform: translateY(0); }
-                  }
-                  .hero-line-1 {
-                    animation: slideDownFade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-                  }
-                  .hero-line-2 {
-                    opacity: 0;
-                    animation: slideUpFade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s forwards;
-                  }
-                `}</style>
-
-                <div className="flex items-center justify-center gap-2 mb-6 sm:mb-8 text-zinc-400">
-                  <Activity className="w-4 h-4" />
-                  <span className="font-mono text-xs uppercase tracking-widest">
-                    Utilization Optimization
-                  </span>
-                </div>
-
-                <div className="flex flex-col items-center mb-8 sm:mb-10">
-                  <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-2 hero-line-1">
-                    DONT JUST HIRE,
-                  </h1>
-                  <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white hero-line-2">
-                    UTILIZE YOUR WORKFORCE.
-                  </h1>
-                </div>
-
-                <p className="max-w-2xl mx-auto text-zinc-400 text-sm sm:text-base md:text-lg leading-relaxed font-light animate-in fade-in duration-1000 delay-700">
-                  Stop searching for talent you already possess. Deploy the Mapping Nexus to
-                  calculate the optimal utilization of your existing workforce.
-                </p>
-              </section>
-            </div>
+            <HeroSection />
 
             <section className="px-4 sm:px-6 py-16 sm:py-24 max-w-7xl mx-auto">
               <PricingCalculator />
@@ -359,6 +338,7 @@ const App: React.FC = () => {
             </section>
 
             <FounderSection />
+            <FaqSection />
           </>
         )}
 
