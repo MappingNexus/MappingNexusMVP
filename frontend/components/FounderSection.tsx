@@ -37,7 +37,7 @@ const teamMembers: TeamMember[] = [
     expertise: ['Business Strategy', 'Operations Management', 'Global Partnerships', 'Corporate Governance', 'Leadership']
   },
   {
-    name: 'Kshitij Tiwari',
+    name: 'Kshitij Tyagi',
     role: 'Founding Partner and Business Lead',
     location: 'India',
     image: 'https://api.dicebear.com/9.x/notionists/svg?seed=Kshitij&lips=variant01&beardProbability=100&glassesProbability=100',
