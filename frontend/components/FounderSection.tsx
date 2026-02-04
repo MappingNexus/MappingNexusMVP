@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Linkedin, Mail, MapPin, ChevronLeft, ChevronRight, Quote } from 'lucide-react';
 
 interface TeamMember {
@@ -37,7 +37,7 @@ const teamMembers: TeamMember[] = [
     expertise: ['Business Strategy', 'Operations Management', 'Global Partnerships', 'Corporate Governance', 'Leadership']
   },
   {
-    name: 'Kshitij Tyagi',
+    name: 'Kshitij Tyagi  ',
     role: 'Founding Partner and Business Lead',
     location: 'India',
     image: 'https://api.dicebear.com/9.x/notionists/svg?seed=Kshitij&lips=variant01&beardProbability=100&glassesProbability=100',
@@ -64,6 +64,13 @@ export const FounderSection: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('right');
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Constants
+  const AUTO_SLIDE_INTERVAL = 6000;
+  const SWIPE_THRESHOLD = 50;
 
   const handleSlide = (newDirection: 'left' | 'right') => {
     if (isAnimating) return;
@@ -80,10 +87,82 @@ export const FounderSection: React.FC = () => {
     }, 400); // Wait for exit animation
   };
 
+  // Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        handleSlide('left');
+        setIsPaused(true); // Pause auto-rotation on interaction
+      } else if (e.key === 'ArrowRight') {
+        handleSlide('right');
+        setIsPaused(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAnimating]);
+
+  // Auto-Rotation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (!isPaused && !isAnimating) {
+      interval = setInterval(() => {
+        handleSlide('right');
+      }, AUTO_SLIDE_INTERVAL);
+    }
+
+    return () => clearInterval(interval);
+  }, [currentIndex, isPaused, isAnimating]);
+
+  // Preload Images
+  useEffect(() => {
+    const nextIndex = (currentIndex + 1) % teamMembers.length;
+    const prevIndex = (currentIndex - 1 + teamMembers.length) % teamMembers.length;
+
+    const preloadImage = (src: string) => {
+      const img = new Image();
+      img.src = src;
+    };
+
+    preloadImage(teamMembers[nextIndex].image);
+    preloadImage(teamMembers[prevIndex].image);
+  }, [currentIndex]);
+
+  // Touch / Swipe Support
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+    setIsPaused(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > SWIPE_THRESHOLD;
+    const isRightSwipe = distance < -SWIPE_THRESHOLD;
+
+    if (isLeftSwipe) {
+      handleSlide('right'); // Swipe left means go to right item
+    } else if (isRightSwipe) {
+      handleSlide('left'); // Swipe right means go to left item
+    }
+  };
+
   const member = teamMembers[currentIndex];
 
   return (
-    <section className="w-full bg-zinc-100 dark:bg-[#080808] py-16 sm:py-20 overflow-hidden relative transition-colors duration-300">
+    <section
+      className="w-full bg-zinc-100 dark:bg-[#080808] py-16 sm:py-20 overflow-hidden relative transition-colors duration-300"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       {/* Background Gradients */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-64 w-96 h-96 bg-purple-200/40 dark:bg-purple-900/10 rounded-full blur-3xl opacity-30"></div>
@@ -126,19 +205,24 @@ export const FounderSection: React.FC = () => {
         </div>
 
         {/* Carousel Container */}
-        <div className="relative max-w-6xl mx-auto">
+        <div
+          className="relative max-w-6xl mx-auto"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           {/* Navigation Buttons */}
           <button
-            onClick={() => handleSlide('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-12 z-20 p-4 rounded-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 hover:scale-110 transition-all backdrop-blur-md group focus:outline-none shadow-lg dark:shadow-none"
+            onClick={() => { handleSlide('left'); setIsPaused(true); }}
+            className="hidden sm:block absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 sm:-translate-x-12 z-20 p-4 rounded-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 hover:scale-110 transition-all backdrop-blur-md group focus:outline-none shadow-lg dark:shadow-none"
             aria-label="Previous team member"
           >
             <ChevronLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
           </button>
 
           <button
-            onClick={() => handleSlide('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-12 z-20 p-4 rounded-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 hover:scale-110 transition-all backdrop-blur-md group focus:outline-none shadow-lg dark:shadow-none"
+            onClick={() => { handleSlide('right'); setIsPaused(true); }}
+            className="hidden sm:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 sm:translate-x-12 z-20 p-4 rounded-full bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-black dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 hover:scale-110 transition-all backdrop-blur-md group focus:outline-none shadow-lg dark:shadow-none"
             aria-label="Next team member"
           >
             <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
@@ -249,6 +333,7 @@ export const FounderSection: React.FC = () => {
                   onClick={() => {
                     setDirection(idx > currentIndex ? 'right' : 'left');
                     setCurrentIndex(idx);
+                    setIsPaused(true);
                   }}
                   className={`h-1 rounded-full transition-all duration-500 ${idx === currentIndex
                     ? 'bg-blue-500 w-12'

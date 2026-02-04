@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from './Button';
-import { Lock, ScanLine, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, ScanLine, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
 import { ForgotPassword } from './ForgotPassword';
 
 interface LoginProps {
@@ -22,7 +22,6 @@ export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) =
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    // Clear error when user starts typing
     setError({ type: '', message: '' });
   };
 
@@ -30,12 +29,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) =
     e.preventDefault();
     setLoading(true);
     setError({ type: '', message: '' });
-    
-    // Simulate API delay & Scanning UI
+
     setTimeout(() => {
       setStep('verifying');
       setTimeout(() => {
-        // Call validation handler with error and success callbacks
         const errorCallback = (type: 'account_not_found' | 'invalid_credentials', message: string) => {
           setError({ type, message });
           setStep('credentials');
@@ -44,7 +41,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) =
         const successCallback = () => {
           setStep('success');
           setTimeout(() => {
-            // Redirect happens after success is shown
+            // Redirect handled by parent
           }, 800);
         };
         onLoginAttempt(formData.email, formData.password, errorCallback, successCallback);
@@ -53,145 +50,142 @@ export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) =
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-zinc-50 px-6">
-      <div className="max-w-md w-full bg-white border-2 border-zinc-200 p-8 md:p-12 relative overflow-hidden">
-        
-        {/* Decorator Elements */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-black"></div>
-        <div className="absolute top-4 right-4 flex gap-1">
-          <div className="w-1 h-1 bg-zinc-300"></div>
-          <div className="w-1 h-1 bg-zinc-300"></div>
-          <div className="w-1 h-1 bg-zinc-300"></div>
-        </div>
+    <div className="relative min-h-[calc(100vh-80px)] flex items-center justify-center overflow-hidden bg-zinc-50">
 
-        {step === 'credentials' && (
-          <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="mb-8 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-zinc-100 rounded-full mb-4">
-                <Lock className="w-5 h-5 text-black" />
+      {/* Background Gradients (Matching Hero) */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-200/40 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-200/40 rounded-full blur-[128px]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md px-6">
+        <div className="bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl p-8 md:p-12 relative overflow-hidden">
+
+          {step === 'credentials' && (
+            <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-zinc-900 text-white rounded-2xl mb-6 shadow-lg shadow-zinc-200">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <h2 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">Welcome Back</h2>
+                <p className="text-zinc-500 text-sm">
+                  Enter your credentials to access the Nexus.
+                </p>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight text-black mb-2">Identify</h2>
-              <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
-                Secure Environment Access
-              </p>
-            </div>
 
-            {error.message && (
-              <div className={`mb-6 p-4 border rounded flex gap-3 ${
-                error.type === 'account_not_found' 
-                  ? 'bg-blue-50 border-blue-200' 
-                  : 'bg-red-50 border-red-200'
-              }`}>
-                <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
-                  error.type === 'account_not_found' ? 'text-blue-600' : 'text-red-600'
-                }`} />
-                <div className="flex-1">
-                  <p className={`text-sm font-semibold ${
-                    error.type === 'account_not_found' ? 'text-blue-900' : 'text-red-900'
+              {error.message && (
+                <div className={`mb-8 p-4 rounded-xl flex gap-3 ${error.type === 'account_not_found'
+                    ? 'bg-blue-50 text-blue-900 border border-blue-100'
+                    : 'bg-red-50 text-red-900 border border-red-100'
                   }`}>
-                    {error.message}
-                  </p>
-                  {error.type === 'account_not_found' && (
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 text-sm">
+                    <p className="font-semibold">{error.message}</p>
+                    {error.type === 'account_not_found' && (
+                      <button
+                        type="button"
+                        onClick={onSignupClick}
+                        className="mt-1 font-medium underline underline-offset-2 hover:text-blue-700"
+                      >
+                        Create an account &rarr;
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-zinc-700 ml-1">Work Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                    className="w-full bg-zinc-50/50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                    placeholder="name@company.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center ml-1">
+                    <label className="text-sm font-semibold text-zinc-700">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                    disabled={loading}
+                    className="w-full bg-zinc-50/50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                    placeholder="••••••••••••"
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <Button
+                    fullWidth
+                    type="submit"
+                    disabled={loading}
+                    className="h-12 rounded-full text-base shadow-xl shadow-zinc-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300"
+                  >
+                    {loading ? 'Authenticating...' : 'Sign In'}
+                  </Button>
+                </div>
+
+                <div className="text-center pt-2">
+                  <p className="text-sm text-zinc-500">
+                    Don't have an account?{' '}
                     <button
                       type="button"
                       onClick={onSignupClick}
-                      className="text-xs mt-2 font-semibold text-blue-600 hover:text-blue-700 border-b border-blue-600 hover:border-blue-700 pb-0.5"
+                      className="font-semibold text-zinc-900 hover:text-zinc-700 transition-colors"
                     >
-                      Go to Sign Up
+                      Sign up now
                     </button>
-                  )}
+                  </p>
                 </div>
               </div>
-            )}
+            </form>
+          )}
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-mono uppercase text-zinc-500 mb-2">
-                  Work Email
-                </label>
-                <input 
-                  type="email" 
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  className="w-full bg-zinc-50 border border-zinc-300 px-4 py-3 font-mono text-sm focus:outline-none focus:border-black transition-colors disabled:bg-zinc-100 disabled:opacity-60"
-                  placeholder="name@company.com"
-                />
+          {step === 'verifying' && (
+            <div className="py-20 text-center">
+              <div className="relative w-20 h-20 mx-auto mb-8">
+                <div className="absolute inset-0 bg-zinc-100 rounded-full animate-ping opacity-75"></div>
+                <div className="relative bg-white border border-zinc-100 rounded-full w-full h-full flex items-center justify-center shadow-xl">
+                  <ScanLine className="w-8 h-8 text-zinc-900" />
+                </div>
               </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Verifying Credentials</h3>
+              <p className="text-zinc-500 text-sm">Establishing secure handshake...</p>
+            </div>
+          )}
 
-              <div>
-                <label className="block text-xs font-mono uppercase text-zinc-500 mb-2">
-                  Password
-                </label>
-                <input 
-                  type="password" 
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  className="w-full bg-zinc-50 border border-zinc-300 px-4 py-3 font-mono text-sm focus:outline-none focus:border-black transition-colors disabled:bg-zinc-100 disabled:opacity-60"
-                  placeholder="••••••••••••"
-                />
+          {step === 'success' && (
+            <div className="py-20 text-center">
+              <div className="w-20 h-20 mx-auto mb-8 bg-green-50 rounded-full flex items-center justify-center">
+                <ShieldCheck className="w-10 h-10 text-green-600" />
               </div>
-
-              <div className="pt-4">
-                <Button fullWidth type="submit" disabled={loading}>
-                  {loading ? 'Processing...' : 'Enter the Nexus'}
-                </Button>
-              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Access Granted</h3>
+              <p className="text-zinc-500 text-sm">Redirecting to dashboard...</p>
             </div>
-            
-            <div className="mt-8 text-center space-y-4">
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className="block w-full text-xs text-zinc-400 hover:text-black transition-colors"
-              >
-                Forgot Password?
-              </button>
-              <button 
-                type="button"
-                onClick={onSignupClick}
-                className="text-xs text-black font-semibold hover:text-zinc-600 transition-colors border-b border-black hover:border-zinc-600 pb-0.5"
-              >
-                New to the Nexus? Create an Account
-              </button>
-            </div>
-          </form>
-        )}
+          )}
 
-        {step === 'verifying' && (
-          <div className="text-center py-12 animate-in fade-in zoom-in duration-300">
-            <ScanLine className="w-12 h-12 text-black mx-auto mb-6 animate-pulse" />
-            <h3 className="font-mono text-sm uppercase tracking-widest mb-2">Verifying Credentials</h3>
-            <p className="text-xs text-zinc-400">Authenticating user...</p>
-            
-            <div className="mt-8 w-full bg-zinc-100 h-1 overflow-hidden">
-              <div className="h-full bg-black animate-[loading_1.5s_ease-in-out_infinite]"></div>
-            </div>
-          </div>
-        )}
-
-        {step === 'success' && (
-          <div className="text-center py-12 animate-in fade-in zoom-in duration-300">
-            <ShieldCheck className="w-12 h-12 text-black mx-auto mb-6" />
-            <h3 className="font-mono text-sm uppercase tracking-widest mb-2">Access Granted</h3>
-            <p className="text-xs text-zinc-400">Redirecting to Command Node...</p>
-          </div>
-        )}
+        </div>
       </div>
-      
+
       {showForgotPassword && <ForgotPassword onClose={() => setShowForgotPassword(false)} />}
-      
-      <style>{`
-        @keyframes loading {
-          0% { width: 0%; transform: translateX(-100%); }
-          100% { width: 100%; transform: translateX(100%); }
-        }
-      `}</style>
     </div>
   );
 };

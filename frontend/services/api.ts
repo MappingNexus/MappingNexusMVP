@@ -2,6 +2,7 @@
  * API Client for Backend Communication
  * Uses relative URLs - Vite proxy forwards to Express server
  */
+import { Employee } from '../types';
 
 const API_BASE_URL = '/api';
 
@@ -82,17 +83,40 @@ export async function getEmployees(userId: string): Promise<ApiResponse<any>> {
     }
 }
 
-export async function addEmployee(userId: string, name: string, role: string, salary?: number): Promise<ApiResponse<any>> {
+export async function addEmployee(userId: string, name: string, role: string, salary?: number, extraData?: Partial<Employee>): Promise<ApiResponse<any>> {
     try {
         const response = await fetch(`${API_BASE_URL}/employees`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, name, role, salary }),
+            body: JSON.stringify({
+                userId,
+                name,
+                role,
+                salary,
+                ...extraData // Spread rich fields (status, location, skills, etc.)
+            }),
         });
         return await response.json();
     } catch (error) {
         console.error('Add employee API error:', error);
         return { success: false, message: 'Failed to add employee' };
+    }
+}
+
+export async function bulkAddEmployees(userId: string, employees: Employee[]): Promise<ApiResponse<any>> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/employees/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId,
+                employees
+            }),
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Bulk add employees API error:', error);
+        return { success: false, message: 'Failed to bulk add employees' };
     }
 }
 

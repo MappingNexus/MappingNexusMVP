@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from './Button';
-import { Upload, FileText, Plus, X, Database, AlertCircle, Scan, CheckCircle2, Loader2, Save } from 'lucide-react';
+import { Upload, FileText, Plus, X, Database, AlertCircle, Scan, CheckCircle2, Loader2, Save, CloudUpload } from 'lucide-react';
 import { Employee } from '../types';
 
 interface DataIngestionProps {
@@ -69,11 +69,11 @@ export const DataIngestion: React.FC<DataIngestionProps> = ({ onComplete }) => {
 
       // Read file as text (for .txt files) or use filename for analysis
       const fileName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-      
+
       const analyzeWithGroq = async (fileContent: string) => {
         try {
           const prompt = `Analyze this resume/CV information and extract the following "Employee DNA" for a resource planning system. Return ONLY a valid JSON object (no markdown, no code blocks, no explanations) with these exact keys: name (string), role (string), location (string), skills (comma-separated string), education (string), pastMissions (string). 
-
+          
 ${fileContent ? `File content:\n${fileContent}` : `Filename: ${fileName}`}
 
 If information is missing, make reasonable inferences based on the filename and context.`;
@@ -109,7 +109,7 @@ If information is missing, make reasonable inferences based on the filename and 
           const data = await response.json();
           const extractedText = data.choices?.[0]?.message?.content || '{}';
           const extractedData = JSON.parse(extractedText);
-          
+
           setFormData(prev => ({
             ...prev,
             name: extractedData.name || fileName || prev.name,
@@ -119,7 +119,7 @@ If information is missing, make reasonable inferences based on the filename and 
             education: extractedData.education || prev.education,
             pastMissions: extractedData.pastMissions || prev.pastMissions,
           }));
-          
+
         } catch (error) {
           console.error("CV analysis error:", error);
           // Fallback: Use filename as hint
@@ -169,7 +169,7 @@ If information is missing, make reasonable inferences based on the filename and 
 
     setManualEntries(prev => [...prev, newEmployee]);
     setSaveSuccess(true);
-    
+
     // Reset form and success state after delay
     setTimeout(() => {
       setSaveSuccess(false);
@@ -189,11 +189,11 @@ If information is missing, make reasonable inferences based on the filename and 
   const handleInitialize = () => {
     // Add some simulated data if user only added one or none to populate the dashboard better
     const simulatedFileData: Employee[] = manualEntries.length < 3 ? [
-      { 
-        id: 'sim-1', 
-        name: 'Sarah Jenkins', 
-        role: 'Senior Strategist', 
-        status: 'Active', 
+      {
+        id: 'sim-1',
+        name: 'Sarah Jenkins',
+        role: 'Senior Strategist',
+        status: 'Active',
         efficiency: 98,
         location: 'New York, USA',
         skills: ['Negotiation', 'Crisis Management', 'Japanese'],
@@ -201,11 +201,11 @@ If information is missing, make reasonable inferences based on the filename and 
         pastMissions: 'Led the Tokyo Merger acquisition. Managed $50M crisis fund.',
         education: 'MBA, Harvard Business School'
       },
-      { 
-        id: 'sim-2', 
-        name: 'David Chen', 
-        role: 'VP of Sales', 
-        status: 'Travel', 
+      {
+        id: 'sim-2',
+        name: 'David Chen',
+        role: 'VP of Sales',
+        status: 'Travel',
         efficiency: 92,
         location: 'London, UK',
         skills: ['Enterprise Sales', 'Cloud Architecture', 'Python'],
@@ -213,11 +213,11 @@ If information is missing, make reasonable inferences based on the filename and 
         pastMissions: 'Expanded EMEA market share by 200%.',
         education: 'BS Computer Science, Stanford'
       },
-      { 
-        id: 'sim-3', 
-        name: 'Elena Rostova', 
-        role: 'Lead Consultant', 
-        status: 'On Mission', 
+      {
+        id: 'sim-3',
+        name: 'Elena Rostova',
+        role: 'Lead Consultant',
+        status: 'On Mission',
         efficiency: 95,
         location: 'Berlin, Germany',
         skills: ['Supply Chain', 'Logistics', 'German'],
@@ -231,231 +231,277 @@ If information is missing, make reasonable inferences based on the filename and 
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-12 animate-in fade-in duration-500">
-      
-      {/* Header */}
-      <div className="mb-10 border-b border-zinc-200 pb-6 flex justify-between items-end">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Database className="w-6 h-6" />
-            <h1 className="text-3xl font-bold tracking-tight">Data Ingestion Protocol</h1>
-          </div>
-          <p className="font-mono text-xs text-zinc-500 uppercase tracking-widest">
-            Populate the Nexus with Employee DNA
-          </p>
-        </div>
-        <div className="text-right">
-           <p className="text-[10px] font-mono uppercase text-zinc-400">Buffered Nodes</p>
-           <p className="text-2xl font-bold">{manualEntries.length}</p>
-        </div>
+    <div className="relative min-h-screen pt-20 pb-12 px-6 overflow-hidden bg-zinc-50">
+
+      {/* Background Gradients (Matching Hero) */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute top-20 right-1/4 w-96 h-96 bg-purple-200/40 rounded-full blur-[128px]" />
+        <div className="absolute bottom-20 left-1/4 w-96 h-96 bg-blue-200/40 rounded-full blur-[128px]" />
       </div>
 
-      <div className="bg-white border-2 border-nexus-charcoal shadow-xl relative overflow-hidden">
-        
-        {/* Smart Upload Zone */}
-        <div className="bg-zinc-50 p-8 border-b border-zinc-200">
-           <div className="max-w-xl mx-auto">
-             <label 
-              className={`
-                group relative flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-300 hover:border-nexus-charcoal transition-colors cursor-pointer bg-white
-                ${isAnalyzing ? 'animate-pulse border-nexus-charcoal bg-zinc-50' : ''}
-              `}
-             >
-               <input 
-                  type="file" 
-                  accept=".pdf,.doc,.docx,.txt" 
-                  className="hidden" 
-                  onChange={handleSmartUpload}
-                  disabled={isAnalyzing}
-               />
-               
-               {isAnalyzing ? (
-                 <div className="text-center">
-                   <Scan className="w-8 h-8 text-black mb-3 mx-auto animate-spin" />
-                   <h3 className="font-mono text-sm uppercase font-bold tracking-widest mb-1">Reading DNA...</h3>
-                   <p className="text-xs text-zinc-500">Extracting skills, history, and biometrics</p>
-                 </div>
-               ) : (
-                 <div className="text-center">
-                   <div className="w-10 h-10 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-zinc-200 transition-colors">
-                      <FileText className="w-5 h-5 text-nexus-charcoal" />
-                   </div>
-                   <h3 className="font-mono text-sm uppercase font-bold tracking-widest mb-1">Smart Upload</h3>
-                   <p className="text-xs text-zinc-500 mb-2">Drop CV/Resume to Auto-Map</p>
-                   <span className="text-[10px] font-mono text-zinc-400 bg-zinc-100 px-2 py-1">GROQ AI ENABLED</span>
-                 </div>
-               )}
-             </label>
-           </div>
+      <div className="relative z-10 max-w-5xl mx-auto animate-in fade-in duration-700">
+
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center p-3 bg-white border border-zinc-200 rounded-2xl shadow-sm mb-6">
+            <Database className="w-6 h-6 text-zinc-900" />
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight text-zinc-900 mb-4">
+            Data Ingestion Protocol
+          </h1>
+          <p className="text-lg text-zinc-500 max-w-2xl mx-auto">
+            Populate the Nexus with Employee DNA. Upload resumes or manually input data to visualize your workforce.
+          </p>
         </div>
 
-        {/* The Form */}
-        <div className="p-8 md:p-12">
-           <h2 className="text-sm font-mono uppercase tracking-widest border-l-4 border-black pl-3 mb-8">
-             Node Configuration
-           </h2>
+        <div className="flex justify-between items-center mb-6">
+          <div>&nbsp;</div>
+          <div className="flex items-center gap-3 px-4 py-2 bg-white/80 backdrop-blur-md border border-zinc-200 rounded-full shadow-sm">
+            <span className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Buffered Nodes</span>
+            <span className="text-sm font-bold bg-zinc-900 text-white px-2 py-0.5 rounded-full">{manualEntries.length}</span>
+          </div>
+        </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-             
-             {/* Column 1: Core & Logistics */}
-             <div className="space-y-6">
-               <h3 className="text-xs font-bold uppercase text-zinc-400 mb-4 border-b border-zinc-100 pb-2">01 // Core Identity</h3>
-               
-               <div>
-                 <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Full Name</label>
-                 <input 
-                   name="name"
-                   value={formData.name}
-                   onChange={handleInputChange}
-                   className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all"
-                   placeholder="e.g. Alex Vance"
-                 />
-               </div>
+        <div className="bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl overflow-hidden">
 
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Primary Role</label>
-                    <select 
-                      name="role"
-                      value={formData.role}
-                      onChange={handleInputChange}
-                      className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black"
-                    >
-                      <option>Engineering</option>
-                      <option>Sales</option>
-                      <option>Leadership</option>
-                      <option>Operations</option>
-                      <option>Product</option>
-                    </select>
-                 </div>
-                 <div>
-                    <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Location</label>
-                    <input 
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black"
-                      placeholder="City, Country"
-                    />
-                 </div>
-               </div>
+          {/* Smart Upload Zone */}
+          <div className="p-8 border-b border-zinc-100 bg-zinc-50/50">
+            <div className="max-w-2xl mx-auto">
+              <label
+                className={`
+                  group relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-3xl transition-all cursor-pointer
+                  ${isAnalyzing
+                    ? 'border-purple-400 bg-purple-50/50'
+                    : 'border-zinc-300 hover:border-zinc-900 hover:bg-white bg-white/50'}
+                `}
+              >
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  className="hidden"
+                  onChange={handleSmartUpload}
+                  disabled={isAnalyzing}
+                />
 
-               <div className="pt-4">
-                 <h3 className="text-xs font-bold uppercase text-zinc-400 mb-4 border-b border-zinc-100 pb-2">02 // Logistics</h3>
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                      <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Current Status</label>
-                      <select 
-                        name="status"
-                        value={formData.status}
-                        onChange={handleInputChange}
-                        className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="On Mission">On Mission</option>
-                        <option value="Travel">Travel</option>
-                        <option value="On Leave">On Leave</option>
-                      </select>
-                   </div>
-                   <div>
-                      <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Travel Ready?</label>
-                      <div 
-                        onClick={handleToggleChange}
-                        className={`
-                          w-full p-3 border cursor-pointer flex items-center justify-between transition-colors
-                          ${formData.travelReady ? 'bg-black border-black text-white' : 'bg-white border-zinc-200 text-zinc-400'}
-                        `}
-                      >
-                        <span className="text-xs font-mono uppercase">{formData.travelReady ? 'YES' : 'NO'}</span>
-                        <div className={`w-2 h-2 rounded-full ${formData.travelReady ? 'bg-green-500' : 'bg-zinc-300'}`}></div>
+                {isAnalyzing ? (
+                  <div className="text-center">
+                    <div className="relative w-16 h-16 mx-auto mb-4">
+                      <div className="absolute inset-0 bg-purple-200 rounded-full animate-ping opacity-75"></div>
+                      <div className="relative bg-white rounded-full w-full h-full flex items-center justify-center shadow-md">
+                        <Scan className="w-8 h-8 text-purple-600 animate-pulse" />
                       </div>
-                   </div>
-                 </div>
-               </div>
-             </div>
+                    </div>
+                    <h3 className="text-lg font-bold text-zinc-900 mb-1">Analyzing Document...</h3>
+                    <p className="text-sm text-zinc-500">Extracting skills, history, and biometrics</p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-zinc-100 group-hover:bg-zinc-900 group-hover:text-white rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-300 shadow-sm">
+                      <CloudUpload className="w-8 h-8 text-zinc-400 group-hover:text-white transition-colors" />
+                    </div>
+                    <h3 className="text-lg font-bold text-zinc-900 mb-1 group-hover:scale-105 transition-transform">Smart Upload</h3>
+                    <p className="text-sm text-zinc-500 mb-3">Drop CV/Resume here to Auto-Map</p>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      Groq AI Enabled
+                    </span>
+                  </div>
+                )}
+              </label>
+            </div>
+          </div>
 
-             {/* Column 2: Skill DNA & History */}
-             <div className="space-y-6">
-                <h3 className="text-xs font-bold uppercase text-zinc-400 mb-4 border-b border-zinc-100 pb-2">03 // Skill DNA</h3>
-                
+          {/* The Form */}
+          <div className="p-8 md:p-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+
+              {/* Column 1: Core & Logistics */}
+              <div className="space-y-8">
                 <div>
-                  <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Primary Skills (Comma Separated)</label>
-                  <input 
-                    name="skills"
-                    value={formData.skills}
-                    onChange={handleInputChange}
-                    className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black"
-                    placeholder="Python, Negotiation, Leadership..."
-                  />
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.skills.split(',').filter(s => s.trim()).map((tag, i) => (
-                      <span key={i} className="bg-zinc-100 text-zinc-600 text-[10px] font-mono px-2 py-1 uppercase">{tag}</span>
-                    ))}
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-6 flex items-center gap-2">
+                    <span className="w-8 h-[1px] bg-zinc-300"></span> Core Identity
+                  </h3>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-zinc-700 ml-1">Full Name</label>
+                      <input
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                        placeholder="e.g. Alex Vance"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-zinc-700 ml-1">Primary Role</label>
+                        <div className="relative">
+                          <select
+                            name="role"
+                            value={formData.role}
+                            onChange={handleInputChange}
+                            className="w-full appearance-none bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                          >
+                            <option>Engineering</option>
+                            <option>Sales</option>
+                            <option>Leadership</option>
+                            <option>Operations</option>
+                            <option>Product</option>
+                          </select>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-zinc-700 ml-1">Location</label>
+                        <input
+                          name="location"
+                          value={formData.location}
+                          onChange={handleInputChange}
+                          className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                          placeholder="City, Country"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="pt-2">
-                   <h3 className="text-xs font-bold uppercase text-zinc-400 mb-4 border-b border-zinc-100 pb-2">04 // History</h3>
-                   <div className="space-y-4">
-                     <div>
-                       <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Past Missions (Summary)</label>
-                       <textarea 
-                          name="pastMissions"
-                          value={formData.pastMissions}
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-6 flex items-center gap-2">
+                    <span className="w-8 h-[1px] bg-zinc-300"></span> Logistics
+                  </h3>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-zinc-700 ml-1">Current Status</label>
+                      <div className="relative">
+                        <select
+                          name="status"
+                          value={formData.status}
                           onChange={handleInputChange}
-                          rows={3}
-                          className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black resize-none"
-                          placeholder="Brief list of high-stakes projects..."
-                       />
-                     </div>
-                     <div>
-                       <label className="block text-[10px] font-mono uppercase text-zinc-500 mb-1">Education & Certs</label>
-                       <textarea 
-                          name="education"
-                          value={formData.education}
-                          onChange={handleInputChange}
-                          rows={2}
-                          className="w-full bg-zinc-50 border border-zinc-200 p-3 text-sm focus:outline-none focus:border-black resize-none"
-                          placeholder="Degrees, MBA, PMP..."
-                       />
-                     </div>
-                   </div>
+                          className="w-full appearance-none bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="On Mission">On Mission</option>
+                          <option value="Travel">Travel</option>
+                          <option value="On Leave">On Leave</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-zinc-700 ml-1">Travel Ready?</label>
+                      <div
+                        onClick={handleToggleChange}
+                        className={`
+                            w-full px-4 py-3 border rounded-xl cursor-pointer flex items-center justify-between transition-all duration-300
+                            ${formData.travelReady
+                            ? 'bg-zinc-900 border-zinc-900 text-white shadow-lg'
+                            : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:border-zinc-300'}
+                          `}
+                      >
+                        <span className="text-sm font-bold">{formData.travelReady ? 'Yes' : 'No'}</span>
+                        <div className={`w-3 h-3 rounded-full shadow-inner ${formData.travelReady ? 'bg-green-400' : 'bg-zinc-300'}`}></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-             </div>
-           </div>
+              </div>
 
-           {/* Actions */}
-           <div className="mt-10 pt-8 border-t border-zinc-100 flex justify-end">
-             <Button 
-               onClick={handleSaveToNexus} 
-               className={`min-w-[180px] transition-all duration-300 ${saveSuccess ? 'bg-green-600 border-green-600 hover:bg-green-700' : ''}`}
-               disabled={!formData.name}
-             >
-               {saveSuccess ? (
-                 <span className="flex items-center gap-2">
-                   <CheckCircle2 className="w-4 h-4" /> Node Mapped
-                 </span>
-               ) : (
-                 <span className="flex items-center gap-2">
-                   <Save className="w-4 h-4" /> Save to Nexus
-                 </span>
-               )}
-             </Button>
-           </div>
-        </div>
-      </div>
+              {/* Column 2: Skill DNA & History */}
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-6 flex items-center gap-2">
+                    <span className="w-8 h-[1px] bg-zinc-300"></span> Skill DNA
+                  </h3>
 
-      <div className="mt-12 flex justify-between items-center">
-        <div className="text-xs text-zinc-400 font-mono">
-           {manualEntries.length === 0 ? 'STATUS: WAITING FOR INPUT' : 'STATUS: READY TO INITIALIZE'}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-zinc-700 ml-1">Primary Skills</label>
+                    <input
+                      name="skills"
+                      value={formData.skills}
+                      onChange={handleInputChange}
+                      className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                      placeholder="Python, Negotiation, Leadership..."
+                    />
+                    <div className="flex flex-wrap gap-2 mt-3 min-h-[32px]">
+                      {formData.skills.split(',').filter(s => s.trim()).map((tag, i) => (
+                        <span key={i} className="bg-zinc-100 text-zinc-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-zinc-200">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-6 flex items-center gap-2">
+                    <span className="w-8 h-[1px] bg-zinc-300"></span> History
+                  </h3>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-zinc-700 ml-1">Past Missions (Summary)</label>
+                      <textarea
+                        name="pastMissions"
+                        value={formData.pastMissions}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium resize-none"
+                        placeholder="Brief list of high-stakes projects..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-zinc-700 ml-1">Education & Certs</label>
+                      <textarea
+                        name="education"
+                        value={formData.education}
+                        onChange={handleInputChange}
+                        rows={2}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium resize-none"
+                        placeholder="Degrees, MBA, PMP..."
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-12 pt-8 border-t border-zinc-100 flex justify-end">
+              <Button
+                onClick={handleSaveToNexus}
+                className={`min-w-[200px] h-12 rounded-full shadow-lg transition-all duration-300 ${saveSuccess
+                    ? 'bg-green-600 border-green-600 hover:bg-green-700 hover:shadow-green-200'
+                    : 'shadow-zinc-200 hover:shadow-xl hover:scale-[1.02]'
+                  }`}
+                disabled={!formData.name}
+              >
+                {saveSuccess ? (
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" /> Node Mapped
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Save className="w-5 h-5" /> Save to Nexus
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
-        <Button 
-          onClick={handleInitialize} 
-          variant="outline"
-          disabled={manualEntries.length === 0}
-        >
-          Initialize Nexus &rarr;
-        </Button>
+
+        <div className="mt-12 flex justify-center pb-20">
+          <Button
+            onClick={handleInitialize}
+            variant="outline"
+            disabled={manualEntries.length === 0}
+            className="rounded-full px-8 py-6 text-base font-semibold border-2 border-zinc-200 hover:border-zinc-900 hover:text-zinc-900 transition-all"
+          >
+            Initialize Nexus &rarr;
+          </Button>
+        </div>
       </div>
     </div>
   );
