@@ -328,8 +328,18 @@ app.get('/api/employees', requireDb, async (req: Request, res: Response) => {
             id: String(emp.id),
             name: String(emp.name),
             role: String(emp.role),
-            salary: emp.salary ? String(emp.salary) : null,
+            salary: emp.salary, // Keep as number, frontend can format
             userId: String(emp.userId),
+
+            // New Rich Fields
+            status: emp.status,
+            efficiency: emp.efficiency,
+            location: emp.location,
+            skills: emp.skills,
+            travelReady: emp.travelReady,
+            pastMissions: emp.pastMissions || '',
+            education: emp.education || '',
+
             tasks: emp.tasks.map((task) => ({
                 id: String(task.id),
                 name: String(task.name),
@@ -357,7 +367,20 @@ app.get('/api/employees', requireDb, async (req: Request, res: Response) => {
  */
 app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
     try {
-        const { userId, name, role, salary } = req.body;
+        const {
+            userId,
+            name,
+            role,
+            salary,
+            // New Fields
+            status,
+            efficiency,
+            location,
+            skills,
+            travelReady,
+            pastMissions,
+            education
+        } = req.body;
 
         if (!userId || !name || !role) {
             return res.status(400).json({
@@ -372,6 +395,15 @@ app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
                 name: String(name),
                 role: String(role),
                 salary: salary ? parseFloat(salary) : null,
+
+                // Save new fields
+                status: status || 'Active',
+                efficiency: efficiency || 100,
+                location: location || 'Remote',
+                skills: Array.isArray(skills) ? skills : [],
+                travelReady: travelReady !== undefined ? travelReady : true,
+                pastMissions: pastMissions || '',
+                education: education || ''
             },
         });
 
@@ -379,10 +411,8 @@ app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
             success: true,
             message: 'Employee added successfully',
             employee: {
+                ...employee,
                 id: String(employee.id),
-                name: String(employee.name),
-                role: String(employee.role),
-                salary: employee.salary ? String(employee.salary) : null,
                 userId: String(employee.userId),
             },
         });
@@ -394,6 +424,60 @@ app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
         });
     }
 });
+
+/**
+ * POST /api/employees/bulk
+ * Add multiple employees at once (For Data Ingestion)
+ */
+app.post('/api/employees/bulk', requireDb, async (req: Request, res: Response) => {
+    try {
+        const { userId, employees } = req.body;
+
+        if (!userId || !employees || !Array.isArray(employees)) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID and employees array are required',
+            });
+        }
+
+        // Prepare data for Prisma createMany (or loop if needed for relations, but createMany is faster)
+        // Note: createMany is supported in recent Prisma versions for Postgres
+
+        const employeesData = employees.map((emp: any) => ({
+            userId: String(userId),
+            name: String(emp.name),
+            role: String(emp.role),
+            salary: emp.salary ? parseFloat(emp.salary) : null,
+            status: emp.status || 'Active',
+            efficiency: emp.efficiency || 100,
+            location: emp.location || 'Remote',
+            skills: Array.isArray(emp.skills) ? emp.skills : [],
+            travelReady: emp.travelReady !== undefined ? emp.travelReady : true,
+            pastMissions: emp.pastMissions || '',
+            education: emp.education || ''
+        }));
+
+        // Using transaction to ensure all or nothing
+        const result = await prisma.employee.createMany({
+            data: employeesData,
+        });
+
+        res.json({
+            success: true,
+            message: `${result.count} employees added successfully`,
+            count: result.count
+        });
+
+    } catch (error: any) {
+        console.error('Bulk add employees error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to bulk add employees',
+            error: error.message
+        });
+    }
+});
+
 
 /**
  * DELETE /api/employees/:id
@@ -742,6 +826,7 @@ if (!process.env.VERCEL) {
         console.log(`   - POST /api/auth/login`);
         console.log(`   - GET  /api/employees`);
         console.log(`   - POST /api/employees`);
+        console.log(`   - POST /api/employees/bulk (NEW)`);
         console.log(`   - DEL  /api/employees/:id`);
         console.log(`   - POST /api/admin/verify`);
         console.log(`   - GET  /api/admin/customers`);

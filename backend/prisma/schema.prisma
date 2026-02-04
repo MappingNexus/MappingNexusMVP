@@ -8,6 +8,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -38,13 +39,23 @@ model Admin {
 }
 
 model Employee {
-  id        String   @id @default(uuid())
-  name      String
-  role      String
-  salary    Float?
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  role         String
+  salary       Float?
+  userId       String
+  
+  // Rich Profile Data
+  status       String   @default("Active") // Active, On Mission, Travel, On Leave
+  efficiency   Int      @default(100)
+  location     String   @default("Remote")
+  skills       String[] // PostgreSQL supports string arrays
+  travelReady  Boolean  @default(true)
+  pastMissions String?  // Text description
+  education    String?  // Text description
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks Task[]

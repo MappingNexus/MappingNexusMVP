@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from './Button';
-import { UserPlus, Shield, CheckCircle2 } from 'lucide-react';
+import { UserPlus, Shield, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface SignupProps {
   onSignupSuccess: (email: string, password: string) => void;
@@ -32,132 +32,123 @@ export const Signup: React.FC<SignupProps> = ({ onSignupSuccess, onLoginClick })
     setLoading(true);
     setStep('creating');
 
-    // Call the async signup handler
-    // The handler will navigate after success
     onSignupSuccess(formData.email, formData.password);
 
-    // Show success state briefly
     setTimeout(() => {
       setStep('success');
     }, 1500);
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center bg-zinc-50 px-6">
-      <div className="max-w-md w-full bg-white border-2 border-zinc-200 p-8 md:p-12 relative overflow-hidden">
+    <div className="relative min-h-[calc(100vh-80px)] flex items-center justify-center overflow-hidden bg-zinc-50">
 
-        {/* Decorator Elements */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-black"></div>
-        <div className="absolute top-4 right-4 flex gap-1">
-          <div className="w-1 h-1 bg-zinc-300"></div>
-          <div className="w-1 h-1 bg-zinc-300"></div>
-          <div className="w-1 h-1 bg-zinc-300"></div>
-        </div>
-
-        {step === 'form' && (
-          <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="mb-8 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 bg-zinc-100 rounded-full mb-4">
-                <UserPlus className="w-5 h-5 text-black" />
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight text-black mb-2">Initiate Protocol</h2>
-              <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
-                Create New Command Node
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-mono uppercase text-zinc-500 mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  required
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  className="w-full bg-zinc-50 border border-zinc-300 px-4 py-3 font-mono text-sm focus:outline-none focus:border-black transition-colors"
-                  placeholder="John Doe"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono uppercase text-zinc-500 mb-2">
-                  Work Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full bg-zinc-50 border border-zinc-300 px-4 py-3 font-mono text-sm focus:outline-none focus:border-black transition-colors"
-                  placeholder="name@company.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono uppercase text-zinc-500 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full bg-zinc-50 border border-zinc-300 px-4 py-3 font-mono text-sm focus:outline-none focus:border-black transition-colors"
-                  placeholder="••••••••••••"
-                />
-              </div>
-
-              <div className="pt-4">
-                <Button fullWidth type="submit" disabled={loading || !isFormValid}>
-                  {loading ? 'Processing...' : 'Create Account'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-8 text-center">
-              <button
-                type="button"
-                onClick={onLoginClick}
-                className="text-xs text-zinc-400 hover:text-black transition-colors border-b border-transparent hover:border-black"
-              >
-                Already have an account? Log In
-              </button>
-            </div>
-          </form>
-        )}
-
-        {step === 'creating' && (
-          <div className="text-center py-12 animate-in fade-in zoom-in duration-300">
-            <Shield className="w-12 h-12 text-black mx-auto mb-6 animate-pulse" />
-            <h3 className="font-mono text-sm uppercase tracking-widest mb-2">Encrypting Data</h3>
-            <p className="text-xs text-zinc-400">Establishing secure node...</p>
-
-            <div className="mt-8 w-full bg-zinc-100 h-1 overflow-hidden">
-              <div className="h-full bg-black animate-[loading_1.5s_ease-in-out_infinite]"></div>
-            </div>
-          </div>
-        )}
-
-        {step === 'success' && (
-          <div className="text-center py-12 animate-in fade-in zoom-in duration-300">
-            <CheckCircle2 className="w-12 h-12 text-black mx-auto mb-6" />
-            <h3 className="font-mono text-sm uppercase tracking-widest mb-2">Node Created</h3>
-            <p className="text-xs text-zinc-400">Redirecting to Dashboard...</p>
-          </div>
-        )}
+      {/* Background Gradients (Matching Hero) */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-200/40 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-200/40 rounded-full blur-[128px]" />
       </div>
 
-      <style>{`
-        @keyframes loading {
-          0% { width: 0%; transform: translateX(-100%); }
-          100% { width: 100%; transform: translateX(100%); }
-        }
-      `}</style>
+      <div className="relative z-10 w-full max-w-md px-6">
+        <div className="bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl p-8 md:p-12 relative overflow-hidden">
+
+          {step === 'form' && (
+            <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-zinc-900 text-white rounded-2xl mb-6 shadow-lg shadow-zinc-200">
+                  <UserPlus className="w-6 h-6" />
+                </div>
+                <h2 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">Create Account</h2>
+                <p className="text-zinc-500 text-sm">
+                  Join the network and start optimizing.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-zinc-700 ml-1">Full Name</label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    required
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    className="w-full bg-zinc-50/50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                    placeholder="e.g. John Doe"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-zinc-700 ml-1">Work Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="w-full bg-zinc-50/50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                    placeholder="name@company.com"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-zinc-700 ml-1">Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="w-full bg-zinc-50/50 border border-zinc-200 rounded-xl px-4 py-3.5 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all font-medium"
+                    placeholder="••••••••••••"
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <Button fullWidth type="submit" disabled={loading || !isFormValid} className="h-12 rounded-full text-base shadow-xl shadow-zinc-200 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
+                    {loading ? 'Creating Account...' : 'Get Started'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="text-center pt-8">
+                <p className="text-sm text-zinc-500">
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={onLoginClick}
+                    className="font-semibold text-zinc-900 hover:text-zinc-700 transition-colors"
+                  >
+                    Log in
+                  </button>
+                </p>
+              </div>
+            </form>
+          )}
+
+          {step === 'creating' && (
+            <div className="py-20 text-center">
+              <div className="relative w-20 h-20 mx-auto mb-8">
+                <div className="absolute inset-0 bg-zinc-100 rounded-full animate-ping opacity-75"></div>
+                <div className="relative bg-white border border-zinc-100 rounded-full w-full h-full flex items-center justify-center shadow-xl">
+                  <Shield className="w-8 h-8 text-zinc-900" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Securing Data</h3>
+              <p className="text-zinc-500 text-sm">Encrypting your workspace...</p>
+            </div>
+          )}
+
+          {step === 'success' && (
+            <div className="py-20 text-center">
+              <div className="w-20 h-20 mx-auto mb-8 bg-green-50 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Account Created</h3>
+              <p className="text-zinc-500 text-sm">Welcome to the Nexus.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

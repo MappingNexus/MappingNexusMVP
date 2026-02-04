@@ -32,8 +32,7 @@ interface UserState {
 // ============ TEMPORARY BYPASS FLAG ============
 // Set to true to bypass login and auto-authenticate as VIP
 // Set to false to re-enable normal login flow
-// TODO: Remove this in next build
-const TEMP_BYPASS_LOGIN = true;
+const TEMP_BYPASS_LOGIN = false;
 
 const App: React.FC = () => {
   // Theme State
@@ -211,20 +210,45 @@ const App: React.FC = () => {
     }
   };
 
-  const handleIngestionComplete = (data: Employee[]) => {
-    // Data from DataIngestion component - save via API
-    // For now, we'll handle this in Dashboard when they actually add employees
-    setEmployees(data);
-    setIsMapping(true);
+  const handleIngestionComplete = async (data: Employee[]) => {
+    // Save to Nexus Backend via Bulk API feature
+    setIsLoadingEmployees(true);
+
+    // Optimistically UI update
+    setEmployees(prev => [...prev, ...data]);
+
+    const response = await api.bulkAddEmployees(user.id, data);
+
+    if (response.success) {
+      // Reload to get IDs and confirmed data from server
+      await loadUserEmployees();
+      setIsMapping(true); // Trigger the mapping animation
+    } else {
+      console.error("Failed to ingest data:", response.message);
+      // Even if failed on server, we leave local state for now so user doesn't lose work immediately,
+      // but warn them.
+      alert("Nexus Protocol Warning: Connectivity interruption. Nodes cached locally but not synced.");
+      setIsLoadingEmployees(false);
+      setIsMapping(true); // Proceed anyway for UX
+    }
   };
 
-  // Add employee function - now uses API
+  // Add employee function - now uses API with rich fields
   const handleAddEmployee = async (newEmployee: Employee) => {
     const response = await api.addEmployee(
       user.id,
       newEmployee.name,
       newEmployee.role,
-      newEmployee.salary ? parseFloat(String(newEmployee.salary)) : undefined
+      newEmployee.salary ? parseFloat(String(newEmployee.salary)) : undefined,
+      {
+        status: newEmployee.status,
+        efficiency: newEmployee.efficiency,
+        location: newEmployee.location,
+        skills: newEmployee.skills,
+        travelReady: newEmployee.travelReady,
+        pastMissions: newEmployee.pastMissions,
+        education: newEmployee.education
+      }
     );
 
     if (response.success) {
