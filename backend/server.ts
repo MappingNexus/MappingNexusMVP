@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
+import { OAuth2Client } from 'google-auth-library';
 
 dotenv.config();
 
@@ -25,41 +26,10 @@ const prisma = new PrismaClient({
     log: ['error', 'warn'],
 });
 
-// ============ CORS CONFIGURATION ============
-// Allow frontend on both port 3000 and 5173, plus production domains
-const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-];
-
-// Add Vercel deployment URLs if provided
-if (process.env.VERCEL_URL) {
-    allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
-}
-if (process.env.FRONTEND_URL) {
-    allowedOrigins.push(process.env.FRONTEND_URL);
-}
-
-const corsOptions = {
-    origin: function (origin: string | undefined, callback: Function) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-            callback(null, true);
-        } else {
-            callback(null, true); // Allow all origins in production for now
-        }
-    },
-    credentials: true,
-    optionsSuccessStatus: 200,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-};
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Middleware
-app.use(cors(corsOptions));
+app.use(cors({ origin: true, credentials: true })); // Allow all origins for debugging
 app.use(express.json());
 
 const SALT_ROUNDS = 10;
@@ -251,6 +221,14 @@ app.post('/api/auth/login', requireDb, async (req: Request, res: Response) => {
         }
 
         // Verify password
+        if (!user.passwordHash) {
+            return res.status(401).json({
+                success: false,
+                type: 'invalid_credentials',
+                message: 'This account uses Google Sign-In. Please use that instead.',
+            });
+        }
+
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
         if (!isPasswordValid) {
@@ -296,6 +274,108 @@ app.post('/api/auth/login', requireDb, async (req: Request, res: Response) => {
             message: 'Login failed',
             error: error.message,
             details: error.code || 'Unknown error'
+
+
+        });
+    }
+});
+
+/**
+ * POST /api/auth/google
+ * Authenticate with Google (Verify ID Token)
+ */
+app.post('/api/auth/google', requireDb, async (req: Request, res: Response) => {
+    try {
+        console.log('[Backend] Received request at /api/auth/google');
+        const { token } = req.body;
+
+        if (!token) {
+            console.warn('[Backend] /api/auth/google called without token');
+            return res.status(400).json({
+                success: false,
+                message: 'Google token is required',
+            });
+        }
+
+        console.log(`[Backend] Verifying Google Token: ${token.substring(0, 15)}...`);
+
+        if (!process.env.GOOGLE_CLIENT_ID) {
+            return res.status(500).json({
+                success: false,
+                message: 'Server configuration error: GOOGLE_CLIENT_ID not set',
+            });
+        }
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+
+        if (!payload || !payload.email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid token payload',
+            });
+        }
+
+        const email = payload.email.toLowerCase();
+
+        // Check if user exists
+        let user = await prisma.user.findUnique({
+            where: { email },
+        });
+
+        if (!user) {
+            // Create user for Google Sign In
+            user = await prisma.user.create({
+                data: {
+                    email,
+                    passwordHash: null,
+                    subscriptionStatus: 'Expired',
+                    accessLevel: 'Standard',
+                    monthlySpend: 0,
+                    isRevenueCounted: true,
+                },
+            });
+        }
+
+        // Check subscription status
+        let isSubscribed = user.subscriptionStatus === 'Active';
+
+        // Check expiry for non-VIP users
+        if (user.accessLevel !== 'VIP' && user.expiryDate) {
+            const now = new Date();
+            if (now > user.expiryDate) {
+                isSubscribed = false;
+                // Update status in DB
+                await prisma.user.update({
+                    where: { id: user.id },
+                    data: { subscriptionStatus: 'Expired' },
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Google login successful',
+            user: {
+                id: String(user.id),
+                email: String(user.email),
+                isSubscribed: user.accessLevel === 'VIP' ? true : isSubscribed,
+                isVIP: user.accessLevel === 'VIP',
+                accessLevel: String(user.accessLevel),
+                expiryDate: user.expiryDate ? String(user.expiryDate.toISOString()) : null,
+            },
+        });
+
+    } catch (error: any) {
+        console.error('Google login error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Google login failed',
+            error: error.message,
         });
     }
 });
@@ -324,7 +404,7 @@ app.get('/api/employees', requireDb, async (req: Request, res: Response) => {
         });
 
         // Convert all fields to strings to prevent React Error #31
-        const sanitizedEmployees = employees.map((emp) => ({
+        const sanitizedEmployees = employees.map((emp: any) => ({
             id: String(emp.id),
             name: String(emp.name),
             role: String(emp.role),
@@ -404,7 +484,7 @@ app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
                 travelReady: travelReady !== undefined ? travelReady : true,
                 pastMissions: pastMissions || '',
                 education: education || ''
-            },
+            } as any,
         });
 
         res.json({

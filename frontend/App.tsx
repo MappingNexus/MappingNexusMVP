@@ -65,6 +65,32 @@ const App: React.FC = () => {
     isAuthenticated: TEMP_BYPASS_LOGIN ? true : false
   });
 
+  // Load User from LocalStorage on Boot
+  useEffect(() => {
+    const savedUser = localStorage.getItem('nexus_user');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        console.log('[App] Restoring session for:', parsedUser.email);
+        setUser(parsedUser);
+
+        // Auto-navigate based on restored state
+        if (parsedUser.isAuthenticated) {
+          if (parsedUser.isSubscribed || parsedUser.isVIP) {
+            console.log('[App] Auto-redirecting to dashboard');
+            setCurrentPage('dashboard');
+          } else {
+            console.log('[App] Auto-redirecting to subscription');
+            setCurrentPage('subscribe');
+          }
+        }
+      } catch (e) {
+        console.error('[App] Failed to parse saved user credentials');
+        localStorage.removeItem('nexus_user');
+      }
+    }
+  }, []);
+
   // Admin data (only loaded when on admin page)
   const [customerDB, setCustomerDB] = useState<CustomerRecord[]>([]);
   const [transactionsDB, setTransactionsDB] = useState<Transaction[]>([]);
@@ -143,13 +169,16 @@ const App: React.FC = () => {
     }
 
     // Set user state from API response
-    setUser({
+    const completeUser = {
       id: String(response.user.id),
       email: String(response.user.email),
       isSubscribed: response.user.isSubscribed,
       isVIP: response.user.isVIP,
       isAuthenticated: true
-    });
+    };
+
+    setUser(completeUser);
+    localStorage.setItem('nexus_user', JSON.stringify(completeUser));
 
     onSuccess();
 
@@ -157,6 +186,33 @@ const App: React.FC = () => {
     setTimeout(() => {
       navigateAfterAuth(response.user.isSubscribed);
     }, 800);
+  };
+
+  const handleGoogleLoginSuccess = async (token: string) => {
+    console.log('[Frontend] Sending token to backend verification...');
+    // Send token to backend
+    const response = await api.googleLogin(token);
+    console.log('[Frontend] Backend verification response:', response);
+
+    if (response.success) {
+      const completeUser = {
+        id: String(response.user.id),
+        email: String(response.user.email),
+        isSubscribed: response.user.isSubscribed,
+        isVIP: response.user.isVIP,
+        isAuthenticated: true
+      };
+
+      setUser(completeUser);
+      localStorage.setItem('nexus_user', JSON.stringify(completeUser));
+
+      // Navigate
+      console.log('[Frontend] Navigating to dashboard...');
+      navigateAfterAuth(response.user.isSubscribed);
+    } else {
+      console.error('[Frontend] Google Auth Failed', response);
+      alert('Google Authentication Failed: ' + (response.message || 'Unknown error'));
+    }
   };
 
   const handleSignupSuccess = async (email: string, password: string) => {
@@ -184,6 +240,19 @@ const App: React.FC = () => {
       console.error('Unexpected signup error:', error);
       alert('An unexpected error occurred during signup. Check console for details.');
     }
+  };
+
+  const handleLogout = () => {
+    console.log('[App] Logging out...');
+    localStorage.removeItem('nexus_user');
+    setUser({
+      id: '',
+      email: '',
+      isSubscribed: false,
+      isVIP: false,
+      isAuthenticated: false
+    });
+    setCurrentPage('home');
   };
 
   // COUPON CODE HANDLER (kept as-is since it's a frontend feature)
@@ -329,6 +398,7 @@ const App: React.FC = () => {
       <Navbar
         onLoginClick={() => setCurrentPage('login')}
         onHomeClick={() => setCurrentPage('home')}
+        onLogoutClick={handleLogout}
         onRequestDemoClick={() => setCurrentPage('demo')}
         currentPage={currentPage}
         isDarkMode={isDarkMode}
@@ -369,6 +439,7 @@ const App: React.FC = () => {
         {currentPage === 'login' && (
           <Login
             onLoginAttempt={handleLoginAttempt}
+            onGoogleLoginSuccess={handleGoogleLoginSuccess}
             onSignupClick={() => setCurrentPage('signup')}
           />
         )}

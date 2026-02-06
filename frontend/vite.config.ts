@@ -17,7 +17,6 @@ export default defineConfig(({ mode }) => {
           configure: (proxy, _options) => {
             proxy.on('error', (err, _req, _res) => {
               // Silently handle proxy errors when backend is not running
-              // This allows frontend to run standalone for UI development
             });
             proxy.on('proxyReq', (proxyReq, req, _res) => {
               console.log('🔄 Proxying:', req.method, req.url, '→', proxyReq.path);
@@ -25,10 +24,11 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+      },
     },
     plugins: [react()],
-    // Vite automatically exposes VITE_* env variables via import.meta.env
-    // No need for define - just use VITE_GEMINI_API_KEY in .env
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

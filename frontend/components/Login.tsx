@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import { Button } from './Button';
 import { Lock, ScanLine, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
 import { ForgotPassword } from './ForgotPassword';
 
 interface LoginProps {
   onLoginAttempt: (email: string, pass: string, onError: (type: 'account_not_found' | 'invalid_credentials', message: string) => void, onSuccess: () => void) => void;
+  onGoogleLoginSuccess?: (token: string) => void;
   onSignupClick: () => void;
 }
 
@@ -13,7 +15,7 @@ interface LoginError {
   message: string;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) => {
+export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onGoogleLoginSuccess, onSignupClick }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'credentials' | 'verifying' | 'success'>('credentials');
@@ -75,8 +77,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) =
 
               {error.message && (
                 <div className={`mb-8 p-4 rounded-xl flex gap-3 ${error.type === 'account_not_found'
-                    ? 'bg-blue-50 text-blue-900 border border-blue-100'
-                    : 'bg-red-50 text-red-900 border border-red-100'
+                  ? 'bg-blue-50 text-blue-900 border border-blue-100'
+                  : 'bg-red-50 text-red-900 border border-red-100'
                   }`}>
                   <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 text-sm">
@@ -141,6 +143,34 @@ export const Login: React.FC<LoginProps> = ({ onLoginAttempt, onSignupClick }) =
                   >
                     {loading ? 'Authenticating...' : 'Sign In'}
                   </Button>
+                </div>
+
+                <div className="relative flex items-center justify-center my-4">
+                  <span className="absolute px-2 bg-zinc-50/50 text-xs font-medium text-zinc-500">OR</span>
+                  <div className="w-full border-t border-zinc-200"></div>
+                </div>
+
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={credentialResponse => {
+                      console.log('[Frontend] Google Login Success:', credentialResponse);
+                      if (credentialResponse.credential) {
+                        console.log('[Frontend] Token received, passing to parent handler...');
+                        if (onGoogleLoginSuccess) {
+                          onGoogleLoginSuccess(credentialResponse.credential);
+                        } else {
+                          console.error('[Frontend] onGoogleLoginSuccess prop is missing!');
+                        }
+                      } else {
+                        console.warn('[Frontend] No credential field in Google response');
+                      }
+                    }}
+                    onError={() => {
+                      console.error('[Frontend] Google Login Failed');
+                      setError({ type: 'invalid_credentials', message: 'Google Login Failed' });
+                    }}
+                    shape="pill"
+                  />
                 </div>
 
                 <div className="text-center pt-2">
