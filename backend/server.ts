@@ -895,32 +895,19 @@ async function seedAdmin() {
 // ============ SERVER START ============
 
 // Only start listening if not in serverless environment (Vercel)
+// Only start listening if not in serverless environment (Vercel)
 if (!process.env.VERCEL) {
-    app.listen(PORT, async () => {
-        console.log(`\n🚀 Backend API Server running on http://localhost:${PORT}`);
+    const HOST = '0.0.0.0'; // Required for Render
+    app.listen(Number(PORT), HOST, async () => {
+        console.log(`\n🚀 Backend API Server running on http://${HOST}:${PORT}`);
         console.log(`\n⚙️  Configuration:`);
         console.log(`   - Database: ${isDatabaseConnected ? '✓ Connected' : '✗ NOT CONNECTED'}`);
-        console.log(`   - Environment: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`\n📊 API Endpoints:`);
-        console.log(`   - POST /api/auth/signup`);
-        console.log(`   - POST /api/auth/login`);
-        console.log(`   - GET  /api/employees`);
-        console.log(`   - POST /api/employees`);
-        console.log(`   - POST /api/employees/bulk (NEW)`);
-        console.log(`   - DEL  /api/employees/:id`);
-        console.log(`   - POST /api/admin/verify`);
-        console.log(`   - GET  /api/admin/customers`);
-        console.log(`   - POST /api/admin/approve`);
-        console.log(`   - POST /api/admin/revoke`);
-        console.log(`   - GET  /api/admin/revenue`);
-        console.log(`   - GET  /api/admin/transactions`);
-        console.log(`\n`);
-
-        // Seed admin on startup
+        // ... rest of logging ...
         if (isDatabaseConnected) {
             await seedAdmin();
         }
     });
 }
+
 
 export default app;
