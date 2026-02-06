@@ -4,7 +4,7 @@
  */
 import { Employee } from '../types';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 interface ApiResponse<T> {
     success: boolean;
@@ -61,6 +61,33 @@ export async function loginUser(email: string, password: string): Promise<ApiRes
         return data;
     } catch (error: any) {
         console.error('❌ Login API Error:', error);
+        return {
+            success: false,
+            message: error.message === 'Failed to fetch'
+                ? 'Cannot connect to server. Make sure the backend is running on port 3001.'
+                : `Network error: ${error.message}`,
+            error: error.message
+        }
+    }
+}
+
+export async function googleLogin(token: string): Promise<ApiResponse<any>> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+            console.error('❌ Google Login failed:', data);
+        }
+
+        return data;
+    } catch (error: any) {
+        console.error('❌ Google Login API Error:', error);
         return {
             success: false,
             message: error.message === 'Failed to fetch'

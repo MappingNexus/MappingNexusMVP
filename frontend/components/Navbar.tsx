@@ -5,13 +5,14 @@ import { Sun, Moon } from 'lucide-react';
 interface NavbarProps {
   onLoginClick: () => void;
   onHomeClick: () => void;
+  onLogoutClick?: () => void;
   onRequestDemoClick?: () => void;
   currentPage: 'home' | 'login' | 'dashboard' | 'signup' | 'ingestion' | 'unauthorized' | 'subscribe' | 'admin' | 'enterprise' | 'demo';
   isDarkMode: boolean;
   toggleTheme: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onLoginClick, onHomeClick, onRequestDemoClick, currentPage, isDarkMode, toggleTheme }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onLoginClick, onHomeClick, onLogoutClick, onRequestDemoClick, currentPage, isDarkMode, toggleTheme }) => {
 
   // If on demo page, render minimal nav
   if (currentPage === 'demo') {
@@ -100,7 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLoginClick, onHomeClick, onReq
               </span>
             </div>
             <button
-              onClick={onHomeClick}
+              onClick={onLogoutClick}
               className="text-xs font-medium text-zinc-500 hover:text-white transition-colors"
             >
               Sign Out
