@@ -47,17 +47,7 @@ const teamMembers: TeamMember[] = [
     bio: 'Spearheading business development and market expansion strategies. deep expertise in identifying new opportunities, building client relationships, and driving revenue growth through strategic sales initiatives.',
     expertise: ['Business Development', 'Sales Strategy', 'Market Analysis', 'Client Relations', 'Revenue Growth']
   },
-  {
-    name: 'Sharvesh',
-    role: 'Founding Engineer and Technical Lead',
-    location: 'India',
-    image: 'https://api.dicebear.com/9.x/notionists/svg?seed=Manya&lips=variant01&beardProbability=100',
-    linkedin: 'https://www.linkedin.com/in/sharvesh-s-ramchandani-5039641b2/',
-    email: 'sharvesh@mappingnexus.com',
-    bioHeader: 'Engineering Mastery',
-    bio: 'Leading the engineering team to build robust and scalable technical solutions. responsible for the core architecture, code quality, and implementing cutting-edge technologies to solve complex engineering challenges.',
-    expertise: ['Software Engineering', 'System Architecture', 'Full Stack Development', 'Team Leadership', 'Technical Strategy']
-  }
+
 ];
 
 export const FounderSection: React.FC = () => {
