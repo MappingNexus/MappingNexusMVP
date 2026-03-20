@@ -12,7 +12,42 @@ interface TeamMember {
   bio: string;
   expertise: string[];
 }
-  
+
+const teamMembers: TeamMember[] = [
+  {
+    name: 'Dhairya Kumar Tiwari',
+    role: 'Founder & CEO',
+    location: 'India',
+    image: 'https://api.dicebear.com/9.x/notionists/svg?seed=Dhairya&lips=variant01&beardProbability=100',
+    linkedin: 'https://www.linkedin.com/in/dhairya-kumar-tiwari-591b16349/',
+    email: 'tiwari.dhairya@zohomail.in',
+    bioHeader: 'Mission',
+    bio: 'Building enterprise solutions for data mapping and employee management at scale. Transforming how organizations organize, manage, and optimize their workforce intelligence through innovative technology and seamless integration.',
+    expertise: ['Full Stack Development', 'Enterprise Solutions', 'Data Management', 'Product Strategy', 'Team Building']
+  },
+  {
+    name: 'Manya Shukla',
+    role: 'Co-Founder and Managing Director',
+    location: 'India',
+    image: 'https://api.dicebear.com/9.x/notionists/svg?seed=Sharvesh&lips=variant01&longHairProbability=100&beardProbability=0',
+    linkedin: 'https://www.linkedin.com/in/manya-shukla-673a69289/',
+    email: 'manya.shukla@mappingnexus.com',
+    bioHeader: 'Operational Excellence',
+    bio: 'Driving the strategic vision and operational efficiency of the company. Overseeing global business operations, fostering key partnerships, and ensuring sustainable growth across all market verticals.',
+    expertise: ['Business Strategy', 'Operations Management', 'Global Partnerships', 'Corporate Governance', 'Leadership']
+  },
+  {
+    name: 'Kshitij Tyagi',
+    role: 'Founding Partner and Business Lead',
+    location: 'India',
+    image: 'https://api.dicebear.com/9.x/notionists/svg?seed=Kshitij&lips=variant01&beardProbability=100&glassesProbability=100',
+    linkedin: '#',
+    email: 'kshitij.tiwari@mappingnexus.com',
+    bioHeader: 'Business Growth',
+    bio: 'Spearheading business development and market expansion strategies, with deep expertise in identifying new opportunities, building client relationships, and driving revenue growth through strategic sales initiatives.',
+    expertise: ['Business Development', 'Sales Strategy', 'Market Analysis', 'Client Relations', 'Revenue Growth']
+  }
+];
 
 export const FounderSection: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -110,6 +145,10 @@ export const FounderSection: React.FC = () => {
   };
 
   const member = teamMembers[currentIndex];
+
+  if (!member) {
+    return null;
+  }
 
   return (
     <section
