@@ -12,7 +12,7 @@ import { SubscriptionPage } from './components/SubscriptionPage';
 import { AdminAnalytics } from './components/AdminAnalytics';
 import { EnterpriseContact } from './components/EnterpriseContact';
 import { RequestDemo } from './components/RequestDemo';
-import { FounderSection } from './components/FounderSection';
+// import { FounderSection } from './components/FounderSection';
 import { HeroSection } from './components/HeroSection';
 import { FaqSection } from './components/FaqSection';
 import { Activity } from 'lucide-react';
@@ -401,6 +401,7 @@ const App: React.FC = () => {
         onLogoutClick={handleLogout}
         onRequestDemoClick={() => setCurrentPage('demo')}
         currentPage={currentPage}
+        isAuthenticated={user.isAuthenticated}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
       />
@@ -431,7 +432,7 @@ const App: React.FC = () => {
               </div>
             </section>
 
-            <FounderSection />
+            {/* <FounderSection /> */}
             <FaqSection />
           </>
         )}

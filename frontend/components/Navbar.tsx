@@ -8,11 +8,12 @@ interface NavbarProps {
   onLogoutClick?: () => void;
   onRequestDemoClick?: () => void;
   currentPage: 'home' | 'login' | 'dashboard' | 'signup' | 'ingestion' | 'unauthorized' | 'subscribe' | 'admin' | 'enterprise' | 'demo';
+  isAuthenticated?: boolean;
   isDarkMode: boolean;
   toggleTheme: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onLoginClick, onHomeClick, onLogoutClick, onRequestDemoClick, currentPage, isDarkMode, toggleTheme }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onLoginClick, onHomeClick, onLogoutClick, onRequestDemoClick, currentPage, isAuthenticated = false, isDarkMode, toggleTheme }) => {
 
   // If on demo page, render minimal nav
   if (currentPage === 'demo') {
@@ -92,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLoginClick, onHomeClick, onLog
           </>
         )}
 
-        {currentPage === 'dashboard' && (
+        {isAuthenticated && currentPage !== 'home' && currentPage !== 'login' && currentPage !== 'signup' && currentPage !== 'demo' && (
           <div className="flex items-center gap-4 relative z-10">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
