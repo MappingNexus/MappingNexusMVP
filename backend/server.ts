@@ -9,6 +9,7 @@ import cors from 'cors';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
+import { AccessLevel, createAuthToken, verifyAuthToken } from './auth.js';
 
 dotenv.config();
 
@@ -33,6 +34,21 @@ app.use(cors({ origin: true, credentials: true })); // Allow all origins for deb
 app.use(express.json());
 
 const SALT_ROUNDS = 10;
+const ADMIN_EMAILS = ['tdhairyakumar@gmail.com', 'sharvesheve@gmail.com'];
+
+type AuthenticatedRequest = Request & {
+    auth?: {
+        userId: string;
+        email: string;
+        accessLevel: AccessLevel;
+    };
+};
+
+const ACCESS_RANK: Record<AccessLevel, number> = {
+    Standard: 1,
+    VIP: 2,
+    Admin: 3,
+};
 
 // ============ DATABASE CONNECTION CHECK WITH TIMEOUT ============
 let isDatabaseConnected = false;
@@ -125,6 +141,131 @@ const requireDb = (req: Request, res: Response, next: Function) => {
     next();
 };
 
+function buildUserResponse(user: {
+    id: string;
+    email: string;
+    accessLevel: string;
+    subscriptionStatus: string;
+    expiryDate: Date | null;
+}) {
+    const normalizedAccessLevel = (user.accessLevel === 'Admin' || user.accessLevel === 'VIP')
+        ? user.accessLevel as AccessLevel
+        : 'Standard';
+
+    let isSubscribed = user.subscriptionStatus === 'Active';
+    if (normalizedAccessLevel === 'VIP' || normalizedAccessLevel === 'Admin') {
+        isSubscribed = true;
+    }
+
+    const token = createAuthToken({
+        sub: String(user.id),
+        email: String(user.email),
+        accessLevel: normalizedAccessLevel,
+    });
+
+    return {
+        id: String(user.id),
+        email: String(user.email),
+        isSubscribed,
+        isVIP: normalizedAccessLevel === 'VIP' || normalizedAccessLevel === 'Admin',
+        isAdmin: normalizedAccessLevel === 'Admin',
+        accessLevel: normalizedAccessLevel,
+        expiryDate: user.expiryDate ? String(user.expiryDate.toISOString()) : null,
+        token,
+    };
+}
+
+function getBearerToken(req: Request) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        return null;
+    }
+
+    return authHeader.slice('Bearer '.length).trim();
+}
+
+const requireAuth = (req: AuthenticatedRequest, res: Response, next: Function) => {
+    const token = getBearerToken(req);
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'Authentication required',
+        });
+    }
+
+    try {
+        const payload = verifyAuthToken(token);
+        req.auth = {
+            userId: payload.sub,
+            email: payload.email,
+            accessLevel: payload.accessLevel,
+        };
+        next();
+    } catch (error: any) {
+        return res.status(401).json({
+            success: false,
+            message: error.message || 'Invalid auth token',
+        });
+    }
+};
+
+const requireRole = (minimumRole: AccessLevel) => {
+    return (req: AuthenticatedRequest, res: Response, next: Function) => {
+        if (!req.auth) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required',
+            });
+        }
+
+        if (ACCESS_RANK[req.auth.accessLevel] < ACCESS_RANK[minimumRole]) {
+            return res.status(403).json({
+                success: false,
+                message: `Requires ${minimumRole} access`,
+            });
+        }
+
+        next();
+    };
+};
+
+const requireWorkspaceAccess = async (req: AuthenticatedRequest, res: Response, next: Function) => {
+    if (!req.auth) {
+        return res.status(401).json({
+            success: false,
+            message: 'Authentication required',
+        });
+    }
+
+    try {
+        const currentUser = await prisma.user.findUnique({
+            where: { id: req.auth.userId },
+        });
+
+        if (!currentUser) {
+            return res.status(401).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
+        if (currentUser.accessLevel === 'Standard' && currentUser.subscriptionStatus !== 'Active') {
+            return res.status(403).json({
+                success: false,
+                message: 'Active subscription required',
+            });
+        }
+
+        next();
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to verify access',
+        });
+    }
+};
+
 // ============ AUTHENTICATION ENDPOINTS ============
 
 /**
@@ -164,21 +305,16 @@ app.post('/api/auth/signup', requireDb, async (req: Request, res: Response) => {
                 email: email.toLowerCase(),
                 passwordHash,
                 subscriptionStatus: 'Expired',
-                accessLevel: 'Standard',
+                accessLevel: ADMIN_EMAILS.includes(email.toLowerCase()) ? 'Admin' : 'Standard',
                 monthlySpend: 0,
-                isRevenueCounted: true,
+                isRevenueCounted: !ADMIN_EMAILS.includes(email.toLowerCase()),
             },
         });
 
         res.json({
             success: true,
             message: 'Account created successfully',
-            user: {
-                id: String(user.id),
-                email: String(user.email),
-                isSubscribed: false,
-                isVIP: false,
-            },
+            user: buildUserResponse(user),
         });
     } catch (error: any) {
         console.error('Signup error:', error);
@@ -239,33 +375,29 @@ app.post('/api/auth/login', requireDb, async (req: Request, res: Response) => {
             });
         }
 
-        // Check subscription status
-        let isSubscribed = user.subscriptionStatus === 'Active';
-
-        // Check expiry for non-VIP users
-        if (user.accessLevel !== 'VIP' && user.expiryDate) {
+        // Check expiry for standard users
+        if (user.accessLevel === 'Standard' && user.expiryDate) {
             const now = new Date();
             if (now > user.expiryDate) {
-                isSubscribed = false;
                 // Update status in DB
-                await prisma.user.update({
+                const updatedUser = await prisma.user.update({
                     where: { id: user.id },
                     data: { subscriptionStatus: 'Expired' },
                 });
+
+                res.json({
+                    success: true,
+                    message: 'Login successful',
+                    user: buildUserResponse(updatedUser),
+                });
+                return;
             }
         }
 
         res.json({
             success: true,
             message: 'Login successful',
-            user: {
-                id: String(user.id),
-                email: String(user.email),
-                isSubscribed: user.accessLevel === 'VIP' ? true : isSubscribed,
-                isVIP: user.accessLevel === 'VIP',
-                accessLevel: String(user.accessLevel),
-                expiryDate: user.expiryDate ? String(user.expiryDate.toISOString()) : null,
-            },
+            user: buildUserResponse(user),
         });
     } catch (error: any) {
         console.error('Login error:', error);
@@ -334,40 +466,36 @@ app.post('/api/auth/google', requireDb, async (req: Request, res: Response) => {
                     email,
                     passwordHash: null,
                     subscriptionStatus: 'Expired',
-                    accessLevel: 'Standard',
+                    accessLevel: ADMIN_EMAILS.includes(email) ? 'Admin' : 'Standard',
                     monthlySpend: 0,
-                    isRevenueCounted: true,
+                    isRevenueCounted: !ADMIN_EMAILS.includes(email),
                 },
             });
         }
 
-        // Check subscription status
-        let isSubscribed = user.subscriptionStatus === 'Active';
-
-        // Check expiry for non-VIP users
-        if (user.accessLevel !== 'VIP' && user.expiryDate) {
+        // Check expiry for standard users
+        if (user.accessLevel === 'Standard' && user.expiryDate) {
             const now = new Date();
             if (now > user.expiryDate) {
-                isSubscribed = false;
                 // Update status in DB
-                await prisma.user.update({
+                const updatedUser = await prisma.user.update({
                     where: { id: user.id },
                     data: { subscriptionStatus: 'Expired' },
                 });
+
+                res.json({
+                    success: true,
+                    message: 'Google login successful',
+                    user: buildUserResponse(updatedUser),
+                });
+                return;
             }
         }
 
         res.json({
             success: true,
             message: 'Google login successful',
-            user: {
-                id: String(user.id),
-                email: String(user.email),
-                isSubscribed: user.accessLevel === 'VIP' ? true : isSubscribed,
-                isVIP: user.accessLevel === 'VIP',
-                accessLevel: String(user.accessLevel),
-                expiryDate: user.expiryDate ? String(user.expiryDate.toISOString()) : null,
-            },
+            user: buildUserResponse(user),
         });
 
     } catch (error: any) {
@@ -386,16 +514,10 @@ app.post('/api/auth/google', requireDb, async (req: Request, res: Response) => {
  * GET /api/employees
  * Get all employees for a specific user
  */
-app.get('/api/employees', requireDb, async (req: Request, res: Response) => {
+app.get('/api/employees', requireDb, requireAuth, requireWorkspaceAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { userId } = req.query;
-
-        if (!userId) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID is required',
-            });
-        }
+        const queryUserId = typeof req.query.userId === 'string' ? req.query.userId : undefined;
+        const userId = req.auth?.accessLevel === 'Admin' && queryUserId ? queryUserId : req.auth!.userId;
 
         const employees = await prisma.employee.findMany({
             where: { userId: String(userId) },
@@ -445,10 +567,9 @@ app.get('/api/employees', requireDb, async (req: Request, res: Response) => {
  * POST /api/employees
  * Add a new employee for a user
  */
-app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
+app.post('/api/employees', requireDb, requireAuth, requireWorkspaceAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const {
-            userId,
             name,
             role,
             salary,
@@ -462,12 +583,14 @@ app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
             education
         } = req.body;
 
-        if (!userId || !name || !role) {
+        if (!name || !role) {
             return res.status(400).json({
                 success: false,
-                message: 'User ID, name, and role are required',
+                message: 'Name and role are required',
             });
         }
+
+        const userId = req.auth!.userId;
 
         const employee = await prisma.employee.create({
             data: {
@@ -509,16 +632,18 @@ app.post('/api/employees', requireDb, async (req: Request, res: Response) => {
  * POST /api/employees/bulk
  * Add multiple employees at once (For Data Ingestion)
  */
-app.post('/api/employees/bulk', requireDb, async (req: Request, res: Response) => {
+app.post('/api/employees/bulk', requireDb, requireAuth, requireWorkspaceAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { userId, employees } = req.body;
+        const { employees } = req.body;
 
-        if (!userId || !employees || !Array.isArray(employees)) {
+        if (!employees || !Array.isArray(employees)) {
             return res.status(400).json({
                 success: false,
-                message: 'User ID and employees array are required',
+                message: 'Employees array is required',
             });
         }
+
+        const userId = req.auth!.userId;
 
         // Prepare data for Prisma createMany (or loop if needed for relations, but createMany is faster)
         // Note: createMany is supported in recent Prisma versions for Postgres
@@ -563,17 +688,9 @@ app.post('/api/employees/bulk', requireDb, async (req: Request, res: Response) =
  * DELETE /api/employees/:id
  * Delete an employee (with data isolation check)
  */
-app.delete('/api/employees/:id', requireDb, async (req: Request, res: Response) => {
+app.delete('/api/employees/:id', requireDb, requireAuth, requireWorkspaceAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const { userId } = req.query;
-
-        if (!userId) {
-            return res.status(400).json({
-                success: false,
-                message: 'User ID is required',
-            });
-        }
 
         // Verify employee belongs to user (data isolation)
         const employee = await prisma.employee.findUnique({
@@ -587,7 +704,7 @@ app.delete('/api/employees/:id', requireDb, async (req: Request, res: Response) 
             });
         }
 
-        if (employee.userId !== userId) {
+        if (req.auth!.accessLevel !== 'Admin' && employee.userId !== req.auth!.userId) {
             return res.status(403).json({
                 success: false,
                 message: 'Unauthorized to delete this employee',
@@ -618,12 +735,12 @@ app.delete('/api/employees/:id', requireDb, async (req: Request, res: Response) 
  * POST /api/admin/verify
  * Verify admin access with email and PIN
  */
-app.post('/api/admin/verify', requireDb, async (req: Request, res: Response) => {
+app.post('/api/admin/verify', requireDb, requireAuth, requireRole('Admin'), async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { email, pin } = req.body;
+        const { pin } = req.body;
 
         const admin = await prisma.admin.findUnique({
-            where: { email: email.toLowerCase() },
+            where: { email: req.auth!.email.toLowerCase() },
         });
 
         if (!admin || admin.pin !== pin) {
@@ -651,7 +768,7 @@ app.post('/api/admin/verify', requireDb, async (req: Request, res: Response) => 
  * GET /api/admin/customers
  * Get all customers for admin dashboard
  */
-app.get('/api/admin/customers', requireDb, async (req: Request, res: Response) => {
+app.get('/api/admin/customers', requireDb, requireAuth, requireRole('Admin'), async (_req: AuthenticatedRequest, res: Response) => {
     try {
         const customers = await prisma.user.findMany({
             orderBy: { createdAt: 'desc' },
@@ -661,7 +778,7 @@ app.get('/api/admin/customers', requireDb, async (req: Request, res: Response) =
             email: String(user.email),
             monthlySpend: String(user.monthlySpend),
             status: String(user.subscriptionStatus),
-            isSubscribed: user.subscriptionStatus === 'Active',
+            isSubscribed: user.subscriptionStatus === 'Active' || user.accessLevel === 'VIP' || user.accessLevel === 'Admin',
             isRevenueCounted: user.isRevenueCounted,
             accessLevel: String(user.accessLevel),
             lastPaymentDate: user.lastPaymentDate ? String(user.lastPaymentDate.toISOString()) : null,
@@ -685,7 +802,7 @@ app.get('/api/admin/customers', requireDb, async (req: Request, res: Response) =
  * POST /api/admin/approve
  * Approve subscription and log transaction
  */
-app.post('/api/admin/approve', requireDb, async (req: Request, res: Response) => {
+app.post('/api/admin/approve', requireDb, requireAuth, requireRole('Admin'), async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { email, amount } = req.body;
 
@@ -715,7 +832,7 @@ app.post('/api/admin/approve', requireDb, async (req: Request, res: Response) =>
                 amount: parseFloat(amount),
                 date: now,
                 payerEmail: email.toLowerCase(),
-                approvedBy: 'tdhairyakumar@gmail.com',
+                approvedBy: req.auth!.email.toLowerCase(),
                 status: 'Completed',
             },
         });
@@ -742,7 +859,7 @@ app.post('/api/admin/approve', requireDb, async (req: Request, res: Response) =>
  * POST /api/admin/revoke
  * Revoke user subscription
  */
-app.post('/api/admin/revoke', requireDb, async (req: Request, res: Response) => {
+app.post('/api/admin/revoke', requireDb, requireAuth, requireRole('Admin'), async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { email } = req.body;
 
@@ -782,13 +899,13 @@ app.post('/api/admin/revoke', requireDb, async (req: Request, res: Response) => 
  * GET /api/admin/revenue
  * Calculate total revenue (ZERO REVENUE RULE applied)
  */
-app.get('/api/admin/revenue', requireDb, async (req: Request, res: Response) => {
+app.get('/api/admin/revenue', requireDb, requireAuth, requireRole('Admin'), async (_req: AuthenticatedRequest, res: Response) => {
     try {
         // Zero Revenue Rule: Exclude tdhairyakumar@gmail.com
         const revenues = await prisma.revenue.findMany({
             where: {
                 payerEmail: {
-                    not: 'tdhairyakumar@gmail.com',
+                    notIn: ADMIN_EMAILS,
                 },
                 status: 'Completed',
             },
@@ -823,7 +940,7 @@ app.get('/api/admin/revenue', requireDb, async (req: Request, res: Response) => 
  * GET /api/admin/transactions
  * Get all transactions for admin dashboard
  */
-app.get('/api/admin/transactions', requireDb, async (req: Request, res: Response) => {
+app.get('/api/admin/transactions', requireDb, requireAuth, requireRole('Admin'), async (_req: AuthenticatedRequest, res: Response) => {
     try {
         const transactions = await prisma.revenue.findMany({
             orderBy: { date: 'desc' },
@@ -892,6 +1009,70 @@ async function seedAdmin() {
     }
 }
 
+async function seedAdditionalAdmins() {
+    try {
+        const additionalAdminEmails = ['sharvesheve@gmail.com'];
+
+        for (const email of additionalAdminEmails) {
+            const existingAdmin = await prisma.admin.findUnique({
+                where: { email },
+            });
+
+            if (!existingAdmin) {
+                await prisma.admin.create({
+                    data: {
+                        email,
+                        pin: '041078',
+                    },
+                });
+                console.log(`Admin account seeded for ${email}`);
+            }
+        }
+    } catch (error) {
+        console.error('Additional admin seed error:', error);
+    }
+}
+
+async function ensureBootstrapAdminUsers() {
+    try {
+        const bootstrapAdmins = [
+            { email: 'tdhairyakumar@gmail.com', password: 'Dktwr@123' },
+            { email: 'sharvesheve@gmail.com', password: 'Sharvesh@123' },
+        ];
+
+        for (const adminAccount of bootstrapAdmins) {
+            const existingUser = await prisma.user.findUnique({
+                where: { email: adminAccount.email },
+            });
+
+            if (!existingUser) {
+                const passwordHash = await bcrypt.hash(adminAccount.password, SALT_ROUNDS);
+                await prisma.user.create({
+                    data: {
+                        email: adminAccount.email,
+                        passwordHash,
+                        subscriptionStatus: 'Active',
+                        accessLevel: 'Admin',
+                        monthlySpend: 0,
+                        isRevenueCounted: false,
+                    },
+                });
+            } else if (existingUser.accessLevel !== 'Admin' || existingUser.subscriptionStatus !== 'Active') {
+                await prisma.user.update({
+                    where: { email: adminAccount.email },
+                    data: {
+                        accessLevel: 'Admin',
+                        subscriptionStatus: 'Active',
+                        isRevenueCounted: false,
+                    },
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Bootstrap admin user seed error:', error);
+    }
+}
+
 // ============ SERVER START ============
 
 // Only start listening if not in serverless environment (Vercel)
@@ -905,6 +1086,8 @@ if (!process.env.VERCEL) {
         // ... rest of logging ...
         if (isDatabaseConnected) {
             await seedAdmin();
+            await seedAdditionalAdmins();
+            await ensureBootstrapAdminUsers();
         }
     });
 }

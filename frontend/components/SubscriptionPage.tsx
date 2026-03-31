@@ -15,7 +15,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({ userEmail, o
   const [couponLoading, setCouponLoading] = useState(false);
   
   // Logic 2: THE VIP BYPASS (Still checking for display purposes if needed, but primary flow is manual)
-  const isVIP = userEmail === 'tdhairyakumar@gmail.com';
+  const isVIP = ['tdhairyakumar@gmail.com', 'sharvesheve@gmail.com'].includes(userEmail);
 
   const handleCouponSubmit = (e: React.FormEvent) => {
     e.preventDefault();

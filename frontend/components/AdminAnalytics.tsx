@@ -12,13 +12,15 @@ interface AdminAnalyticsProps {
   transactions: Transaction[];
   onApprovalApprove: (email: string, amount: number) => void;
   onRevoke: (email: string) => void;
+  onVerifyPin: (pin: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({ 
   customers, 
   transactions,
   onApprovalApprove,
-  onRevoke
+  onRevoke,
+  onVerifyPin
 }) => {
   // --- SECURITY PROTOCOL STATE ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -46,7 +48,7 @@ export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({
   // Set to true to bypass admin PIN check
   // Set to false to re-enable PIN verification
   // TODO: Remove this in next build
-  const TEMP_BYPASS_ADMIN_PIN = true;
+  const TEMP_BYPASS_ADMIN_PIN = false;
 
   // --- SECURITY LOGIC ---
   useEffect(() => {
@@ -70,7 +72,7 @@ export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({
     setStorageStats(getStorageStats());
   }, []);
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -87,7 +89,8 @@ export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({
       return;
     }
 
-    if (pin === '041078') {
+    const verification = await onVerifyPin(pin);
+    if (verification.success) {
       setIsAuthenticated(true);
       setErrorMsg('');
     } else {
@@ -102,14 +105,15 @@ export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({
         localStorage.setItem('nexus_admin_lockout', lockUntil.toString());
         setErrorMsg('SECURITY BREACH DETECTED. TERMINAL LOCKED FOR 10 MIN.');
       } else {
-        setErrorMsg(`INVALID PIN. ATTEMPTS REMAINING: ${3 - newAttempts}`);
+        setErrorMsg(verification.message || `INVALID PIN. ATTEMPTS REMAINING: ${3 - newAttempts}`);
       }
     }
   };
 
   // --- ANALYTICS ENGINE LOGIC ---
+  const privilegedEmails = ['tdhairyakumar@gmail.com', 'sharvesheve@gmail.com'];
   const revenueTransactions = transactions.filter(t => 
-    t.email !== 'tdhairyakumar@gmail.com' && 
+    !privilegedEmails.includes(t.email) && 
     t.status === 'Completed'
   );
 
@@ -468,7 +472,7 @@ export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({
               <h3 className="font-mono text-xs uppercase text-zinc-400">Subscription Management</h3>
             </div>
             <div className="text-[10px] font-mono text-zinc-600">
-              {customers.filter(c => c.email !== 'tdhairyakumar@gmail.com').length} Active Users
+              {customers.filter(c => !privilegedEmails.includes(c.email)).length} Active Users
             </div>
           </div>
 
@@ -485,11 +489,11 @@ export const AdminAnalytics: React.FC<AdminAnalyticsProps> = ({
               </thead>
               <tbody className="divide-y divide-zinc-900">
                 {customers.map((cust, idx) => {
-                  if (cust.email === 'tdhairyakumar@gmail.com') return null; // Double check exclusion for table
+                  if (privilegedEmails.includes(cust.email)) return null;
 
                   const daysRemaining = getDaysRemaining(cust.accessExpiry);
                   const isExpired = daysRemaining <= 0;
-                  const isVIP = cust.accessLevel === 'VIP';
+                  const isVIP = cust.accessLevel === 'VIP' || cust.accessLevel === 'Admin';
 
                   return (
                     <tr 

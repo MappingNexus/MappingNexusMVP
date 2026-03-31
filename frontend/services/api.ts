@@ -4,7 +4,10 @@
  */
 import { Employee } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const rawApiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = rawApiBaseUrl.endsWith('/api')
+    ? rawApiBaseUrl
+    : `${rawApiBaseUrl.replace(/\/$/, '')}/api`;
 
 interface ApiResponse<T> {
     success: boolean;
@@ -13,13 +16,42 @@ interface ApiResponse<T> {
     [key: string]: any;
 }
 
+function getStoredAuthToken() {
+    try {
+        const storedUser = localStorage.getItem('nexus_user');
+        if (!storedUser) {
+            return null;
+        }
+
+        const parsed = JSON.parse(storedUser);
+        return parsed?.token || null;
+    } catch {
+        return null;
+    }
+}
+
+function createHeaders(includeAuth = false) {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+
+    if (includeAuth) {
+        const token = getStoredAuthToken();
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+    }
+
+    return headers;
+}
+
 // ============ AUTHENTICATION ============
 
 export async function signupUser(email: string, password: string): Promise<ApiResponse<any>> {
     try {
         const response = await fetch(`${API_BASE_URL}/auth/signup`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(),
             body: JSON.stringify({ email, password }),
         });
 
@@ -47,7 +79,7 @@ export async function loginUser(email: string, password: string): Promise<ApiRes
     try {
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(),
             body: JSON.stringify({ email, password }),
         });
 
@@ -75,7 +107,7 @@ export async function googleLogin(token: string): Promise<ApiResponse<any>> {
     try {
         const response = await fetch(`${API_BASE_URL}/auth/google`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(),
             body: JSON.stringify({ token }),
         });
 
@@ -102,7 +134,9 @@ export async function googleLogin(token: string): Promise<ApiResponse<any>> {
 
 export async function getEmployees(userId: string): Promise<ApiResponse<any>> {
     try {
-        const response = await fetch(`${API_BASE_URL}/employees?userId=${userId}`);
+        const response = await fetch(`${API_BASE_URL}/employees?userId=${userId}`, {
+            headers: createHeaders(true),
+        });
         return await response.json();
     } catch (error) {
         console.error('Get employees API error:', error);
@@ -114,7 +148,7 @@ export async function addEmployee(userId: string, name: string, role: string, sa
     try {
         const response = await fetch(`${API_BASE_URL}/employees`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(true),
             body: JSON.stringify({
                 userId,
                 name,
@@ -134,7 +168,7 @@ export async function bulkAddEmployees(userId: string, employees: Employee[]): P
     try {
         const response = await fetch(`${API_BASE_URL}/employees/bulk`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(true),
             body: JSON.stringify({
                 userId,
                 employees
@@ -151,6 +185,7 @@ export async function deleteEmployee(employeeId: string, userId: string): Promis
     try {
         const response = await fetch(`${API_BASE_URL}/employees/${employeeId}?userId=${userId}`, {
             method: 'DELETE',
+            headers: createHeaders(true),
         });
         return await response.json();
     } catch (error) {
@@ -161,12 +196,12 @@ export async function deleteEmployee(employeeId: string, userId: string): Promis
 
 // ============ ADMIN ============
 
-export async function verifyAdmin(email: string, pin: string): Promise<ApiResponse<any>> {
+export async function verifyAdmin(pin: string): Promise<ApiResponse<any>> {
     try {
         const response = await fetch(`${API_BASE_URL}/admin/verify`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, pin }),
+            headers: createHeaders(true),
+            body: JSON.stringify({ pin }),
         });
         return await response.json();
     } catch (error) {
@@ -177,7 +212,9 @@ export async function verifyAdmin(email: string, pin: string): Promise<ApiRespon
 
 export async function getCustomers(): Promise<ApiResponse<any>> {
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/customers`);
+        const response = await fetch(`${API_BASE_URL}/admin/customers`, {
+            headers: createHeaders(true),
+        });
         return await response.json();
     } catch (error) {
         console.error('Get customers API error:', error);
@@ -189,7 +226,7 @@ export async function approveSubscription(email: string, amount: number): Promis
     try {
         const response = await fetch(`${API_BASE_URL}/admin/approve`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(true),
             body: JSON.stringify({ email, amount }),
         });
         return await response.json();
@@ -203,7 +240,7 @@ export async function revokeSubscription(email: string): Promise<ApiResponse<any
     try {
         const response = await fetch(`${API_BASE_URL}/admin/revoke`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: createHeaders(true),
             body: JSON.stringify({ email }),
         });
         return await response.json();
@@ -215,7 +252,9 @@ export async function revokeSubscription(email: string): Promise<ApiResponse<any
 
 export async function getRevenue(): Promise<ApiResponse<any>> {
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/revenue`);
+        const response = await fetch(`${API_BASE_URL}/admin/revenue`, {
+            headers: createHeaders(true),
+        });
         return await response.json();
     } catch (error) {
         console.error('Get revenue API error:', error);
@@ -225,7 +264,9 @@ export async function getRevenue(): Promise<ApiResponse<any>> {
 
 export async function getTransactions(): Promise<ApiResponse<any>> {
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/transactions`);
+        const response = await fetch(`${API_BASE_URL}/admin/transactions`, {
+            headers: createHeaders(true),
+        });
         return await response.json();
     } catch (error) {
         console.error('Get transactions API error:', error);

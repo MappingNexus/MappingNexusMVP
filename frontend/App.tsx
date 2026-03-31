@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { PricingCalculator } from './components/PricingCalculator';
 import { Footer } from './components/Footer';
@@ -12,33 +12,64 @@ import { SubscriptionPage } from './components/SubscriptionPage';
 import { AdminAnalytics } from './components/AdminAnalytics';
 import { EnterpriseContact } from './components/EnterpriseContact';
 import { RequestDemo } from './components/RequestDemo';
-// import { FounderSection } from './components/FounderSection';
+import FounderSection from './components/FounderSection';
 import { HeroSection } from './components/HeroSection';
 import { FaqSection } from './components/FaqSection';
-import { Activity } from 'lucide-react';
 import { Employee, CustomerRecord, Transaction } from './types';
 import * as api from './services/api';
 
 type Page = 'home' | 'login' | 'dashboard' | 'signup' | 'ingestion' | 'unauthorized' | 'subscribe' | 'admin' | 'enterprise' | 'demo';
+type AccessLevel = 'Standard' | 'VIP' | 'Admin';
 
 interface UserState {
   id: string;
   email: string;
+  accessLevel: AccessLevel;
   isSubscribed: boolean;
   isVIP: boolean;
+  isAdmin: boolean;
   isAuthenticated: boolean;
+  token: string;
 }
 
-// ============ TEMPORARY BYPASS FLAG ============
-// Set to true to bypass login and auto-authenticate as VIP
-// Set to false to re-enable normal login flow
 const TEMP_BYPASS_LOGIN = false;
 
-const App: React.FC = () => {
-  // Theme State
-  const [isDarkMode, setIsDarkMode] = useState(true);
+const EMPTY_USER: UserState = {
+  id: '',
+  email: '',
+  accessLevel: 'Standard',
+  isSubscribed: false,
+  isVIP: false,
+  isAdmin: false,
+  isAuthenticated: false,
+  token: '',
+};
 
-  // Toggle Theme Effect
+const App: React.FC = () => {
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isMapping, setIsMapping] = useState(false);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [customerDB, setCustomerDB] = useState<CustomerRecord[]>([]);
+  const [transactionsDB, setTransactionsDB] = useState<Transaction[]>([]);
+  const [user, setUser] = useState<UserState>(() => {
+    if (!TEMP_BYPASS_LOGIN) {
+      return EMPTY_USER;
+    }
+
+    return {
+      id: 'temp-admin-id',
+      email: 'tdhairyakumar@gmail.com',
+      accessLevel: 'Admin',
+      isSubscribed: true,
+      isVIP: true,
+      isAdmin: true,
+      isAuthenticated: true,
+      token: '',
+    };
+  });
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -51,56 +82,79 @@ const App: React.FC = () => {
     setIsDarkMode(prev => !prev);
   };
 
-  const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [isMapping, setIsMapping] = useState(false);
-  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const canAccessWorkspace = user.isAuthenticated && (user.isSubscribed || user.isVIP || user.isAdmin);
 
-  // Auth State
-  const [user, setUser] = useState<UserState>({
-    id: TEMP_BYPASS_LOGIN ? 'temp-admin-id' : '',
-    email: TEMP_BYPASS_LOGIN ? 'tdhairyakumar@gmail.com' : '',
-    isSubscribed: TEMP_BYPASS_LOGIN ? true : false,
-    isVIP: TEMP_BYPASS_LOGIN ? true : false,
-    isAuthenticated: TEMP_BYPASS_LOGIN ? true : false
-  });
+  const persistUser = (nextUser: UserState) => {
+    setUser(nextUser);
+    localStorage.setItem('nexus_user', JSON.stringify(nextUser));
+  };
 
-  // Load User from LocalStorage on Boot
+  const clearStoredUser = () => {
+    localStorage.removeItem('nexus_user');
+    setUser(EMPTY_USER);
+  };
+
+  const normalizeUser = (responseUser: any): UserState => {
+    const accessLevel = (responseUser.accessLevel === 'Admin' || responseUser.accessLevel === 'VIP')
+      ? responseUser.accessLevel as AccessLevel
+      : 'Standard';
+
+    return {
+      id: String(responseUser.id),
+      email: String(responseUser.email),
+      accessLevel,
+      isSubscribed: Boolean(responseUser.isSubscribed),
+      isVIP: Boolean(responseUser.isVIP),
+      isAdmin: Boolean(responseUser.isAdmin),
+      isAuthenticated: true,
+      token: String(responseUser.token || ''),
+    };
+  };
+
+  const navigateAfterAuth = (nextUser: UserState) => {
+    if (nextUser.isAdmin) {
+      setCurrentPage('admin');
+      return;
+    }
+
+    if (nextUser.isSubscribed || nextUser.isVIP) {
+      setCurrentPage(employees.length === 0 ? 'ingestion' : 'dashboard');
+      return;
+    }
+
+    setCurrentPage('subscribe');
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem('nexus_user');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        console.log('[App] Restoring session for:', parsedUser.email);
-        setUser(parsedUser);
+    if (!savedUser) {
+      return;
+    }
 
-        // Auto-navigate based on restored state
-        if (parsedUser.isAuthenticated) {
-          if (parsedUser.isSubscribed || parsedUser.isVIP) {
-            console.log('[App] Auto-redirecting to dashboard');
-            setCurrentPage('dashboard');
-          } else {
-            console.log('[App] Auto-redirecting to subscription');
-            setCurrentPage('subscribe');
-          }
-        }
-      } catch (e) {
-        console.error('[App] Failed to parse saved user credentials');
+    try {
+      const parsedUser = JSON.parse(savedUser) as UserState;
+      if (!parsedUser.token) {
         localStorage.removeItem('nexus_user');
+        return;
       }
+
+      setUser(parsedUser);
+
+      if (parsedUser.isAuthenticated) {
+        navigateAfterAuth(parsedUser);
+      }
+    } catch {
+      localStorage.removeItem('nexus_user');
     }
   }, []);
 
-  // Admin data (only loaded when on admin page)
-  const [customerDB, setCustomerDB] = useState<CustomerRecord[]>([]);
-  const [transactionsDB, setTransactionsDB] = useState<Transaction[]>([]);
-
-  // Load employees when user is authenticated
   useEffect(() => {
-    if (user.isAuthenticated && user.id) {
+    if (user.isAuthenticated && user.id && canAccessWorkspace) {
       loadUserEmployees();
+    } else if (!user.isAuthenticated) {
+      setEmployees([]);
     }
-  }, [user.isAuthenticated, user.id]);
+  }, [user.id, user.isAuthenticated, canAccessWorkspace]);
 
   const loadUserEmployees = async () => {
     if (!user.id) return;
@@ -109,30 +163,38 @@ const App: React.FC = () => {
     const response = await api.getEmployees(user.id);
 
     if (response.success && response.employees) {
-      // Data is already sanitized with String() on server
       setEmployees(response.employees);
     }
+
     setIsLoadingEmployees(false);
   };
 
-  // Protected routes check
   useEffect(() => {
-    // TEMPORARY: Skip protection if bypass is enabled
     if (TEMP_BYPASS_LOGIN) {
       return;
     }
 
-    const protectedRoutes: Page[] = ['dashboard', 'ingestion', 'admin'];
-
-    if (protectedRoutes.includes(currentPage)) {
-      if (!user.isAuthenticated) {
-        setCurrentPage('unauthorized');
-      } else if (!user.isSubscribed && !user.isVIP && currentPage !== 'admin') {
-        // For admin route, we'll handle VIP check separately
-        setCurrentPage('subscribe');
-      }
+    const protectedRoutes: Page[] = ['dashboard', 'ingestion', 'admin', 'subscribe'];
+    if (!protectedRoutes.includes(currentPage)) {
+      return;
     }
-  }, [currentPage, user.isAuthenticated, user.isSubscribed, user.isVIP]);
+
+    if (!user.isAuthenticated) {
+      setCurrentPage('unauthorized');
+      return;
+    }
+
+    if (currentPage === 'admin') {
+      if (!user.isAdmin) {
+        setCurrentPage('unauthorized');
+      }
+      return;
+    }
+
+    if ((currentPage === 'dashboard' || currentPage === 'ingestion') && !canAccessWorkspace) {
+      setCurrentPage('subscribe');
+    }
+  }, [currentPage, user, canAccessWorkspace]);
 
   const handleLoginAttempt = async (
     email: string,
@@ -140,20 +202,20 @@ const App: React.FC = () => {
     onError: (type: 'account_not_found' | 'invalid_credentials', message: string) => void,
     onSuccess: () => void
   ) => {
-    // TEMPORARY: Bypass API call if flag is enabled
     if (TEMP_BYPASS_LOGIN) {
-      // Auto-login without API call
-      setUser({
+      const bypassUser: UserState = {
         id: 'temp-admin-id',
         email: email || 'tdhairyakumar@gmail.com',
+        accessLevel: 'Admin',
         isSubscribed: true,
         isVIP: true,
-        isAuthenticated: true
-      });
+        isAdmin: true,
+        isAuthenticated: true,
+        token: '',
+      };
+      setUser(bypassUser);
       onSuccess();
-      setTimeout(() => {
-        setCurrentPage('dashboard');
-      }, 800);
+      setTimeout(() => setCurrentPage('admin'), 800);
       return;
     }
 
@@ -168,51 +230,23 @@ const App: React.FC = () => {
       return;
     }
 
-    // Set user state from API response
-    const completeUser = {
-      id: String(response.user.id),
-      email: String(response.user.email),
-      isSubscribed: response.user.isSubscribed,
-      isVIP: response.user.isVIP,
-      isAuthenticated: true
-    };
-
-    setUser(completeUser);
-    localStorage.setItem('nexus_user', JSON.stringify(completeUser));
-
+    const nextUser = normalizeUser(response.user);
+    persistUser(nextUser);
     onSuccess();
-
-    // Navigate after success screen
-    setTimeout(() => {
-      navigateAfterAuth(response.user.isSubscribed);
-    }, 800);
+    setTimeout(() => navigateAfterAuth(nextUser), 800);
   };
 
   const handleGoogleLoginSuccess = async (token: string) => {
-    console.log('[Frontend] Sending token to backend verification...');
-    // Send token to backend
     const response = await api.googleLogin(token);
-    console.log('[Frontend] Backend verification response:', response);
 
-    if (response.success) {
-      const completeUser = {
-        id: String(response.user.id),
-        email: String(response.user.email),
-        isSubscribed: response.user.isSubscribed,
-        isVIP: response.user.isVIP,
-        isAuthenticated: true
-      };
-
-      setUser(completeUser);
-      localStorage.setItem('nexus_user', JSON.stringify(completeUser));
-
-      // Navigate
-      console.log('[Frontend] Navigating to dashboard...');
-      navigateAfterAuth(response.user.isSubscribed);
-    } else {
-      console.error('[Frontend] Google Auth Failed', response);
+    if (!response.success) {
       alert('Google Authentication Failed: ' + (response.message || 'Unknown error'));
+      return;
     }
+
+    const nextUser = normalizeUser(response.user);
+    persistUser(nextUser);
+    navigateAfterAuth(nextUser);
   };
 
   const handleSignupSuccess = async (email: string, password: string) => {
@@ -220,89 +254,53 @@ const App: React.FC = () => {
       const response = await api.signupUser(email, password);
 
       if (!response.success) {
-        console.error('Signup failed:', response.message);
-        // TODO: Show error to user in UI
         alert(`Signup failed: ${response.message}`);
         return;
       }
 
-      // Set user state
-      setUser({
-        id: String(response.user.id),
-        email: String(response.user.email),
-        isSubscribed: false,
-        isVIP: false,
-        isAuthenticated: true
-      });
-
+      const nextUser = normalizeUser(response.user);
+      persistUser(nextUser);
       setCurrentPage('subscribe');
     } catch (error: any) {
-      console.error('Unexpected signup error:', error);
       alert('An unexpected error occurred during signup. Check console for details.');
     }
   };
 
   const handleLogout = () => {
-    console.log('[App] Logging out...');
-    localStorage.removeItem('nexus_user');
-    setUser({
-      id: '',
-      email: '',
-      isSubscribed: false,
-      isVIP: false,
-      isAuthenticated: false
-    });
+    clearStoredUser();
     setCurrentPage('home');
   };
 
-  // COUPON CODE HANDLER (kept as-is since it's a frontend feature)
   const handleCouponRedemption = (couponCode: string) => {
     if (couponCode.toUpperCase() === 'DKJ') {
-      // For now, just navigate - in production, you'd call an API to apply coupon
-      setUser(prev => ({ ...prev, isSubscribed: true }));
-      navigateAfterAuth(true);
+      const nextUser = {
+        ...user,
+        isSubscribed: true,
+      };
+      persistUser(nextUser);
+      navigateAfterAuth(nextUser);
       return { success: true, message: 'Coupon applied! You now have 30 days of access.' };
-    } else {
-      return { success: false, message: 'Invalid coupon code. Please try again.' };
     }
-  };
 
-  const navigateAfterAuth = (hasSubscription: boolean) => {
-    if (hasSubscription) {
-      if (employees.length === 0) {
-        setCurrentPage('ingestion');
-      } else {
-        setCurrentPage('dashboard');
-      }
-    } else {
-      setCurrentPage('subscribe');
-    }
+    return { success: false, message: 'Invalid coupon code. Please try again.' };
   };
 
   const handleIngestionComplete = async (data: Employee[]) => {
-    // Save to Nexus Backend via Bulk API feature
     setIsLoadingEmployees(true);
-
-    // Optimistically UI update
     setEmployees(prev => [...prev, ...data]);
 
     const response = await api.bulkAddEmployees(user.id, data);
 
     if (response.success) {
-      // Reload to get IDs and confirmed data from server
       await loadUserEmployees();
-      setIsMapping(true); // Trigger the mapping animation
+      setIsMapping(true);
     } else {
-      console.error("Failed to ingest data:", response.message);
-      // Even if failed on server, we leave local state for now so user doesn't lose work immediately,
-      // but warn them.
-      alert("Nexus Protocol Warning: Connectivity interruption. Nodes cached locally but not synced.");
+      alert('Nexus Protocol Warning: Connectivity interruption. Nodes cached locally but not synced.');
       setIsLoadingEmployees(false);
-      setIsMapping(true); // Proceed anyway for UX
+      setIsMapping(true);
     }
   };
 
-  // Add employee function - now uses API with rich fields
   const handleAddEmployee = async (newEmployee: Employee) => {
     const response = await api.addEmployee(
       user.id,
@@ -316,22 +314,19 @@ const App: React.FC = () => {
         skills: newEmployee.skills,
         travelReady: newEmployee.travelReady,
         pastMissions: newEmployee.pastMissions,
-        education: newEmployee.education
+        education: newEmployee.education,
       }
     );
 
     if (response.success) {
-      // Reload employees from server to stay in sync
       await loadUserEmployees();
     }
   };
 
-  // Delete employee function - now uses API
   const handleDeleteEmployee = async (employeeId: string) => {
     const response = await api.deleteEmployee(employeeId, user.id);
 
     if (response.success) {
-      // Reload employees from server
       await loadUserEmployees();
     }
   };
@@ -341,7 +336,6 @@ const App: React.FC = () => {
     setCurrentPage('dashboard');
   };
 
-  // Admin Functions - now use API
   const loadAdminData = async () => {
     const customersResp = await api.getCustomers();
     const transactionsResp = await api.getTransactions();
@@ -355,23 +349,21 @@ const App: React.FC = () => {
     }
   };
 
-  // Load admin data when admin page is accessed
   useEffect(() => {
-    if (currentPage === 'admin' && user.isVIP) {
+    if (currentPage === 'admin' && user.isAdmin) {
       loadAdminData();
     }
-  }, [currentPage, user.isVIP]);
+  }, [currentPage, user.isAdmin]);
 
   const handleApprovalApprove = async (targetEmail: string, amount: number) => {
     const response = await api.approveSubscription(targetEmail, amount);
 
     if (response.success) {
-      // Reload admin data
       await loadAdminData();
 
-      // If approving currently logged in user, update their state
       if (user.email === targetEmail) {
-        setUser(prev => ({ ...prev, isSubscribed: true }));
+        const nextUser = { ...user, isSubscribed: true };
+        persistUser(nextUser);
       }
     }
   };
@@ -380,17 +372,20 @@ const App: React.FC = () => {
     const response = await api.revokeSubscription(targetEmail);
 
     if (response.success) {
-      // Reload admin data
       await loadAdminData();
 
-      // If revoking currently logged in user
-      if (user.email === targetEmail) {
-        setUser(prev => ({ ...prev, isSubscribed: false }));
+      if (user.email === targetEmail && !user.isAdmin && !user.isVIP) {
+        const nextUser = { ...user, isSubscribed: false };
+        persistUser(nextUser);
         if (['dashboard', 'ingestion'].includes(currentPage)) {
           setCurrentPage('subscribe');
         }
       }
     }
+  };
+
+  const handleVerifyAdminPin = async (pin: string) => {
+    return api.verifyAdmin(pin);
   };
 
   return (
@@ -400,23 +395,18 @@ const App: React.FC = () => {
         onHomeClick={() => setCurrentPage('home')}
         onLogoutClick={handleLogout}
         onRequestDemoClick={() => setCurrentPage('demo')}
+        onDashboardClick={() => setCurrentPage(canAccessWorkspace ? 'dashboard' : 'subscribe')}
+        onAdminClick={() => setCurrentPage('admin')}
+        onEnterpriseClick={() => setCurrentPage('enterprise')}
         currentPage={currentPage}
         isAuthenticated={user.isAuthenticated}
+        canAccessWorkspace={canAccessWorkspace}
+        isAdmin={user.isAdmin}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
       />
 
       {isMapping && <MappingLoader onComplete={handleMappingComplete} />}
-
-      {/* ADMIN OVERRIDE BUTTON: Only visible to VIP */}
-      {user.isVIP && currentPage !== 'admin' && currentPage !== 'home' && currentPage !== 'demo' && (
-        <button
-          onClick={() => setCurrentPage('admin')}
-          className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50 bg-[#121212] text-white px-4 sm:px-5 py-2 sm:py-3 font-mono text-xs uppercase tracking-widest border border-zinc-700 shadow-2xl hover:bg-black hover:scale-105 transition-all"
-        >
-          Admin Center
-        </button>
-      )}
 
       <main className="flex-grow">
         {currentPage === 'home' && (
@@ -432,7 +422,7 @@ const App: React.FC = () => {
               </div>
             </section>
 
-            {/* <FounderSection /> */}
+            <FounderSection />
             <FaqSection />
           </>
         )}
@@ -453,7 +443,7 @@ const App: React.FC = () => {
         )}
 
         {currentPage === 'unauthorized' && (
-          <Unauthorized onSubscribeClick={() => setCurrentPage('subscribe')} />
+          <Unauthorized onSubscribeClick={() => setCurrentPage(user.isAuthenticated ? 'subscribe' : 'login')} />
         )}
 
         {currentPage === 'subscribe' && (
@@ -470,7 +460,7 @@ const App: React.FC = () => {
         {currentPage === 'dashboard' && (
           <Dashboard
             employees={employees}
-            isVIP={user.isVIP}
+            isVIP={user.isVIP || user.isAdmin}
             onAddEmployee={handleAddEmployee}
             onDeleteEmployee={handleDeleteEmployee}
           />
@@ -482,19 +472,14 @@ const App: React.FC = () => {
             transactions={transactionsDB}
             onApprovalApprove={handleApprovalApprove}
             onRevoke={handleRevoke}
+            onVerifyPin={handleVerifyAdminPin}
           />
         )}
 
-        {currentPage === 'enterprise' && (
-          <EnterpriseContact />
-        )}
-
-        {currentPage === 'demo' && (
-          <RequestDemo />
-        )}
+        {currentPage === 'enterprise' && <EnterpriseContact />}
+        {currentPage === 'demo' && <RequestDemo />}
       </main>
 
-      {/* Footer remains on most pages, passes the navigation handler */}
       {(currentPage === 'home' || currentPage === 'enterprise') && (
         <Footer onEnterpriseClick={() => setCurrentPage('enterprise')} />
       )}
