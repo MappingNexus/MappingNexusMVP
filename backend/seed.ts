@@ -2,85 +2,166 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
+const ADMIN_PIN = '041078';
+
+const adminAccounts = [
+    {
+        email: 'tdhairyakumar@gmail.com',
+        password: 'Dktwr@123',
+    },
+    {
+        email: 'sharvesheve@gmail.com',
+        password: 'Sharvesh@123',
+    },
+];
+
+const sampleUsers = [
+    {
+        email: 'aarti.ops@mappingnexus.com',
+        password: 'Aarti@123',
+        subscriptionStatus: 'Active',
+        accessLevel: 'Standard',
+        monthlySpend: 49,
+        isRevenueCounted: true,
+    },
+    {
+        email: 'rohan.pm@mappingnexus.com',
+        password: 'Rohan@123',
+        subscriptionStatus: 'Expired',
+        accessLevel: 'Standard',
+        monthlySpend: 29,
+        isRevenueCounted: true,
+    },
+    {
+        email: 'neha.hr@mappingnexus.com',
+        password: 'Neha@123',
+        subscriptionStatus: 'Active',
+        accessLevel: 'Standard',
+        monthlySpend: 79,
+        isRevenueCounted: true,
+    },
+    {
+        email: 'vikram.sales@mappingnexus.com',
+        password: 'Vikram@123',
+        subscriptionStatus: 'Active',
+        accessLevel: 'VIP',
+        monthlySpend: 149,
+        isRevenueCounted: true,
+    },
+    {
+        email: 'sana.finance@mappingnexus.com',
+        password: 'Sana@123',
+        subscriptionStatus: 'Active',
+        accessLevel: 'Standard',
+        monthlySpend: 99,
+        isRevenueCounted: true,
+    },
+    {
+        email: 'arjun.tech@mappingnexus.com',
+        password: 'Arjun@123',
+        subscriptionStatus: 'Expired',
+        accessLevel: 'Standard',
+        monthlySpend: 39,
+        isRevenueCounted: true,
+    },
+];
 
 async function seedDatabase() {
-    console.log('🌱 Starting database seed...\n');
+    console.log('Starting database seed...\n');
 
     try {
-        // 1. Seed Admin record
-        console.log('📋 Seeding Admin table...');
-        const existingAdmin = await prisma.admin.findUnique({
-            where: { email: 'tdhairyakumar@gmail.com' },
-        });
-
-        if (!existingAdmin) {
-            await prisma.admin.create({
-                data: {
-                    email: 'tdhairyakumar@gmail.com',
-                    pin: '041078',
-                },
+        console.log('Seeding Admin table...');
+        for (const adminAccount of adminAccounts) {
+            const existingAdmin = await prisma.admin.findUnique({
+                where: { email: adminAccount.email },
             });
-            console.log('✅ Admin record created');
-        } else {
-            console.log('ℹ️  Admin record already exists');
+
+            if (!existingAdmin) {
+                await prisma.admin.create({
+                    data: {
+                        email: adminAccount.email,
+                        pin: ADMIN_PIN,
+                    },
+                });
+                console.log(`Created admin record for ${adminAccount.email}`);
+            } else {
+                console.log(`Admin record already exists for ${adminAccount.email}`);
+            }
         }
 
-        // 2. Seed VIP User account (THIS IS CRITICAL FOR ADMIN LOGIN)
-        console.log('\n📋 Seeding VIP User account...');
-        const existingUser = await prisma.user.findUnique({
-            where: { email: 'tdhairyakumar@gmail.com' },
-        });
-
-        if (!existingUser) {
-            // Hash the admin password
-            const passwordHash = await bcrypt.hash('Dktwr@123', 10);
-
-            await prisma.user.create({
-                data: {
-                    email: 'tdhairyakumar@gmail.com',
-                    passwordHash,
-                    subscriptionStatus: 'Active',
-                    accessLevel: 'VIP',
-                    monthlySpend: 0,
-                    isRevenueCounted: false, // Admin revenue is not counted
-                },
+        console.log('\nSeeding admin-capable user accounts...');
+        for (const adminAccount of adminAccounts) {
+            const existingUser = await prisma.user.findUnique({
+                where: { email: adminAccount.email },
             });
-            console.log('✅ VIP User account created');
-            console.log('   📧 Email: tdhairyakumar@gmail.com');
-            console.log('   🔑 Password: Dktwr@123');
-        } else {
-            // Update existing user to VIP if not already
-            if (existingUser.accessLevel !== 'VIP') {
-                await prisma.user.update({
-                    where: { email: 'tdhairyakumar@gmail.com' },
+
+            if (!existingUser) {
+                const passwordHash = await bcrypt.hash(adminAccount.password, 10);
+
+                await prisma.user.create({
                     data: {
-                        accessLevel: 'VIP',
+                        email: adminAccount.email,
+                        passwordHash,
+                        subscriptionStatus: 'Active',
+                        accessLevel: 'Admin',
+                        monthlySpend: 0,
+                        isRevenueCounted: false,
+                    },
+                });
+                console.log(`Created admin-capable user for ${adminAccount.email}`);
+            } else {
+                await prisma.user.update({
+                    where: { email: adminAccount.email },
+                    data: {
+                        accessLevel: 'Admin',
                         subscriptionStatus: 'Active',
                         isRevenueCounted: false,
                     },
                 });
-                console.log('✅ Upgraded existing user to VIP');
-            } else {
-                console.log('ℹ️  VIP User already exists');
+                console.log(`Ensured VIP access for ${adminAccount.email}`);
             }
         }
 
-        console.log('\n✅ Database seed completed successfully!');
-        console.log('\n🎉 You can now login as admin with:');
-        console.log('   📧 Email: tdhairyakumar@gmail.com');
-        console.log('   🔑 Password: Dktwr@123');
+        console.log('\nSeeding sample users...');
+        for (const sampleUser of sampleUsers) {
+            const existingUser = await prisma.user.findUnique({
+                where: { email: sampleUser.email },
+            });
 
+            if (!existingUser) {
+                const passwordHash = await bcrypt.hash(sampleUser.password, 10);
+                await prisma.user.create({
+                    data: {
+                        email: sampleUser.email,
+                        passwordHash,
+                        subscriptionStatus: sampleUser.subscriptionStatus,
+                        accessLevel: sampleUser.accessLevel,
+                        monthlySpend: sampleUser.monthlySpend,
+                        isRevenueCounted: sampleUser.isRevenueCounted,
+                    },
+                });
+                console.log(`Created sample user ${sampleUser.email}`);
+            } else {
+                console.log(`Sample user already exists for ${sampleUser.email}`);
+            }
+        }
+
+        console.log('\nDatabase seed completed successfully.');
+        console.log('\nAdmin-capable accounts:');
+        for (const adminAccount of adminAccounts) {
+            console.log(`Email: ${adminAccount.email}`);
+            console.log(`Password: ${adminAccount.password}`);
+            console.log(`PIN: ${ADMIN_PIN}`);
+        }
     } catch (error) {
-        console.error('\n❌ Error seeding database:', error);
+        console.error('\nError seeding database:', error);
         throw error;
     } finally {
         await prisma.$disconnect();
     }
 }
 
-// Run the seed
-seedDatabase()
-    .catch((error) => {
-        console.error('Seed failed:', error);
-        process.exit(1);
-    });
+seedDatabase().catch((error) => {
+    console.error('Seed failed:', error);
+    process.exit(1);
+});

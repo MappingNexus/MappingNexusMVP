@@ -16,7 +16,7 @@ model User {
   email              String    @unique
   passwordHash       String?
   subscriptionStatus String    @default("Expired") // Active, Expired
-  accessLevel        String    @default("Standard") // Standard, VIP
+  accessLevel        String    @default("Standard") // Standard, VIP, Admin
   lastPaymentDate    DateTime?
   expiryDate         DateTime?
   monthlySpend       Float     @default(0)
