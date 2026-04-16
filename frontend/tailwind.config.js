@@ -1,14 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: 'class',
   content: [
     './index.html',
-    './App.tsx',
-    './index.tsx',
+    './*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
     './services/**/*.{ts,tsx}',
     './utils/**/*.{ts,tsx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -25,10 +24,22 @@ export default {
         nexus: {
           black: '#0A0A0A',
           charcoal: '#111111',
+          dark: '#1A1A1A',
+          border: '#2A2A2A',
           mid: '#404040',
+          muted: '#8A8A8A',
           light: '#E5E5E5',
           white: '#FFFFFF',
+          green: '#00FF66',
+          red: '#FF3333',
+          orange: '#FF9900',
+          coral: '#FF6B35',
+          purple: '#9D4EDD',
         },
+      },
+      backgroundImage: {
+        'nexus-gradient': 'linear-gradient(135deg, #9D4EDD 0%, #FF6B35 100%)',
+        'nexus-gradient-subtle': 'linear-gradient(135deg, #9D4EDD22 0%, #FF6B3522 100%)',
       },
     },
   },
