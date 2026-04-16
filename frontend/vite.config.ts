@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       // Proxy API requests to Express backend (optional - only if backend is running)
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: env.VITE_API_URL || 'http://localhost:3001',
           changeOrigin: true,
           secure: false,
           configure: (proxy, _options) => {
