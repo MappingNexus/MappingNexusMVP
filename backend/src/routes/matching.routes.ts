@@ -118,6 +118,9 @@ async function runRetrievalQA(
             lvl: candidate.employee.seniorityLevel,
             load: candidate.employee.currentProjectLoad,
             travel: candidate.employee.travelEligible,
+            calendar: (candidate.employee.availabilityWindows || [])
+                .slice(0, 3)
+                .map((w: any) => `${w.window_type} (${w.start_date} to ${w.end_date})`),
             skills: (candidate.employee.skills || [])
                 .slice(0, 6)
                 .map((s: any) => `${s.skill_name}:${s.proficiency}`),
@@ -205,9 +208,28 @@ function calculateConfidence(
     // 2. AVAILABILITY (25%)
     let availabilityScore = 50;
     if (emp.current_project_load <= 1) availabilityScore = 100;
-    else if (emp.current_project_load <= 2) availabilityScore = 70;
-    else if (emp.current_project_load <= 3) availabilityScore = 40;
+    else if (emp.current_project_load <= 2) availabilityScore = 80;
+    else if (emp.current_project_load <= 3) availabilityScore = 50;
     else availabilityScore = 20;
+
+    // Calendar check (penalize if blocked by holiday/projects in near future)
+    const windows = emp.availabilityWindows || [];
+    let conflictPenalty = 0;
+    const thirtyDaysFromNow = now + 30 * 86400000;
+    
+    windows.forEach((w: any) => {
+        const start = new Date(w.start_date).getTime();
+        const end = new Date(w.end_date).getTime();
+        if (start < thirtyDaysFromNow && end > now) {
+            conflictPenalty += (w.window_type === 'holiday' ? 30 : 15);
+        }
+    });
+
+    if (emp.availability_from && new Date(emp.availability_from).getTime() > thirtyDaysFromNow) {
+        conflictPenalty += 40; // fully unavailable until a distinct future date
+    }
+
+    availabilityScore = Math.max(0, availabilityScore - conflictPenalty);
 
     if (requirements.travelRequired && !emp.travel_eligible) {
         availabilityScore *= 0.3;
@@ -430,6 +452,19 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
             return acc;
         }, {});
 
+        // ── BATCH: fetch all availability windows ──
+        const { data: allWindowsRaw } = await db
+            .from('availability_window')
+            .select('employee_id, window_type, start_date, end_date')
+            .in('employee_id', allEmployeeIds)
+            .eq('company_id', user.companyId);
+
+        const windowsByEmployee = (allWindowsRaw || []).reduce((acc: Record<string, any[]>, w) => {
+            if (!acc[w.employee_id]) acc[w.employee_id] = [];
+            acc[w.employee_id].push(w);
+            return acc;
+        }, {});
+
         // ── PARALLEL: decrypt all costs and names at once ──
         const [decryptedCosts, decryptedNames] = await Promise.all([
             Promise.all(employees.map(async emp => {
@@ -453,10 +488,12 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
             const name = decryptedNames[i];
 
             const empAllSkills = skillsByEmployee[emp.employee_id] || [];
+            const empWindows = windowsByEmployee[emp.employee_id] || [];
+            
             // Skills that matched the query (for scoring)
             const matchingEmpSkills = (matchingSkills || []).filter(s => s.employee_id === emp.employee_id);
 
-            const empWithCost = { ...emp, cost_per_day_value: costValue };
+            const empWithCost = { ...emp, cost_per_day_value: costValue, availabilityWindows: empWindows };
             const scores = calculateConfidence(empWithCost, matchingEmpSkills, reqSkills, requirements);
 
             candidateProfiles.push({
@@ -469,6 +506,7 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
                     travelEligible: emp.travel_eligible,
                     currentProjectLoad: emp.current_project_load,
                     tenureYears: emp.tenure_years,
+                    availabilityWindows: empWindows,
                     skills: empAllSkills,
                     costPerDay: user.role === 'hr' ? costValue : undefined,
                 },

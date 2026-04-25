@@ -63,4 +63,7 @@ export const env = {
 
     // Ports/origins
     CORS_ORIGIN: optional('CORS_ORIGIN', 'http://localhost:5173,http://localhost:3000'),
+
+    // Google OAuth
+    GOOGLE_CLIENT_ID: optional('GOOGLE_CLIENT_ID', 'placeholder-google-client-id.apps.googleusercontent.com'),
 } as const;

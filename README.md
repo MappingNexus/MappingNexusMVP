@@ -1,12 +1,11 @@
-# MappingNexus
+# Mapping Nexus MVP
 
-A full-stack resource planning and workforce management platform with AI-powered employee data ingestion, admin analytics, and subscription management.
+A full-stack resource planning and workforce management platform with AI-powered employee embedding matching, temporal availability tracking, and role-based access control.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+ 
-- PostgreSQL database
 - npm or yarn
 
 ### Installation
@@ -22,32 +21,25 @@ cd ../frontend
 npm install
 ```
 
-2. **Setup Database:**
-```bash
-cd backend
-# Create .env file with DATABASE_URL
-# Run migrations
-npx prisma migrate dev
-# Seed admin user
-npm run seed
-```
-
-3. **Configure Environment Variables:**
+2. **Configure Environment Variables:**
 
 **Backend `.env`:**
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/mappingnexus
+DATABASE_URL=postgresql://<user>:<password>@<neon-host>/<db>?sslmode=require
+JWT_SECRET=mappingnexus-local-dev-secret-change-in-prod
+OPENROUTER_API_KEY=sk-or-v1-...
+ENCRYPTION_KEK=deadbeefcafebabedeadbeefcafebabedeadbeefcafebabedeadbeefcafebabe
 PORT=3001
 NODE_ENV=development
-EMAIL_SERVICE=gmail
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
 **Frontend `.env`:**
 ```env
-VITE_GROQ_API_KEY=your-groq-api-key
-VITE_API_URL=http://localhost:3001
+VITE_API_URL=http://localhost:3001/api
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
 ### Running the Application
@@ -68,153 +60,85 @@ Frontend runs on: `http://localhost:5173`
 
 ---
 
-## 🔐 Login Credentials
+## 🔐 Login Credentials & Google OAuth
 
-### Regular User Login
-- **Email:** `tdhairyakumar@gmail.com`
-- **Password:** `Dktwr@123`
+The application uses Role-Based Access Control (RBAC). Your dashboard view depends entirely on your database `role`.
 
-### Admin Access
-- **Email:** `tdhairyakumar@gmail.com`
-- **PIN:** `041078`
+**Google OAuth:**
+You can sign in using the **"Sign in with Google"** button once your account has been provisioned by an HR administrator.
 
-**Note:** Login as regular user first, then navigate to Admin Analytics page and enter the PIN.
-
----
-
-## 📁 Project Structure
-
-```
-mappingnexus/
-├── backend/           # Express API server
-│   ├── server.ts      # Main API server
-│   ├── prisma/        # Database schema & migrations
-│   └── seed.ts        # Database seeding
-├── frontend/          # React + Vite frontend
-│   ├── components/    # React components
-│   ├── services/      # API client
-│   └── utils/         # Utilities
-└── README.md          # This file
-```
+*Note: For demo purposes, the Tenant Secret (Security Vault) requirement has been bypassed so you can sign in with 1-click.*
 
 ---
 
 ## 🛠️ Tech Stack
 
 **Frontend:**
-- React 18
-- TypeScript
-- Vite
+- React 18 + TypeScript + Vite
 - Tailwind CSS
-- Recharts
+- `@react-oauth/google`
 - Lucide React
 
 **Backend:**
-- Node.js
-- Express
-- TypeScript
-- Prisma ORM
-- PostgreSQL
-- bcrypt (password hashing)
-- Nodemailer (email service)
+- Node.js + Express + TypeScript
+- Neon Postgres Serverless (via `pg` pool)
+- Custom JWT Authentication
+- Google Auth Library (`google-auth-library`)
 
 **AI/ML:**
-- Groq API (for CV/resume analysis)
+- OpenRouter API (Parallelized Embedding Generation & Context-Aware Matching)
 
 ---
 
-## ✨ Features
+## ✨ Core Features
 
-- **User Authentication:** Signup, login, password reset with OTP
-- **Employee Management:** Add, view, delete employees
-- **AI-Powered Data Ingestion:** Smart upload for CV/resume parsing
-- **Admin Dashboard:** Customer management, revenue tracking, subscription approval
-- **Subscription Management:** Tiered access (Standard/VIP)
-- **Role-Based Access Control:** Standard users, VIP users, Admin
+- **Google OAuth:** 1-click seamless login.
+- **AI Matching Engine:** Finds the best employees for a project by generating parallelized skill embeddings and scoring them via LLM.
+- **Calendar-Aware Logic:** Matching engine analyzes `availability_windows` to penalize candidates with upcoming holidays or project overlap.
+- **Enterprise Security (Vault):** E2E Encryption architecture using a Tenant Secret (KEK) to protect PII at the database level.
+- **Role-Based Access Control:** Separate dashboards for HR, Managers, and Employees.
 
 ---
 
-## 🔧 Development
+## 🧠 AI Architecture & Matching Engine
 
-### Database Commands
+The core value proposition of Mapping Nexus is its high-accuracy AI employee-to-project matching system. It operates in a multi-stage pipeline:
+
+1. **Parallelized Embedding Generation:** When new employees or roles are ingested, the system uses `text-embedding-3-small` (via OpenRouter) to convert their skillsets into high-dimensional vectors. Batch operations use `Promise.all` for extreme concurrency.
+2. **Vector Similarity Search (pgvector):** When a manager requests staffing, the backend queries the Neon PostgreSQL database using Cosine Similarity (`<=>`) to instantly find the top 50 mathematically closest candidate profiles.
+3. **Temporal Retrieval-Augmented Generation (RAG):** The system fetches the calendar `availability_windows` for the top candidates, checking for conflicting holidays or pre-booked projects over the next 30 days.
+4. **LLM Decision Matrix:** A fast LLM model evaluates the filtered candidates against the exact project requirements, heavily penalizing candidates with scheduling conflicts, and returns a final `confidence_score` (0-100%) along with an analytical justification.
+
+---
+
+## 💾 Demo Data Generation
+
+If you are setting up a fresh database instance, you will need to populate it with synthetic profiles and embeddings to test the AI engine.
+
+**1. Generate Dummy Candidates:**
+*(If a seeder exists, run your standard seeder command here)*
+
+**2. Backfill AI Embeddings:**
+Once you have raw employee data, you must generate their vector embeddings so the AI can search them mathematically:
 ```bash
 cd backend
-npx prisma generate          # Generate Prisma client
-npx prisma migrate dev       # Run migrations
-npx prisma studio           # Open Prisma Studio
-npm run seed                # Seed database
+npx tsx src/scripts/backfill-embeddings.ts
 ```
-
-### Build for Production
-```bash
-# Backend
-cd backend
-npm run build
-
-# Frontend
-cd frontend
-npm run build
-```
-
----
-
-## 📝 API Endpoints
-
-### Authentication
-- `POST /api/auth/signup` - Create new user
-- `POST /api/auth/login` - User login
-- `POST /api/auth/send-otp` - Send OTP for password reset
-- `POST /api/auth/verify-otp` - Verify OTP
-- `POST /api/auth/reset-password` - Reset password
-
-### Employees
-- `GET /api/employees?userId=xxx` - Get user's employees
-- `POST /api/employees` - Add employee
-- `DELETE /api/employees/:id` - Delete employee
-
-### Admin
-- `POST /api/admin/verify` - Verify admin PIN
-- `GET /api/admin/customers` - Get all customers
-- `POST /api/admin/approve` - Approve subscription
-- `POST /api/admin/revoke` - Revoke subscription
-- `GET /api/admin/revenue` - Get revenue data
-- `GET /api/admin/transactions` - Get all transactions
-
----
-
-## 🔒 Security Notes
-
-- Passwords are hashed using bcrypt
-- Admin PIN verification required for admin endpoints
-- CORS configured for local development
-- Environment variables for sensitive data
-- **Note:** Currently admin endpoints are not fully protected - add middleware in production
+*This script is heavily optimized to process hundreds of employees concurrently via in-memory caching and Promise batching.*
 
 ---
 
 ## 🐛 Troubleshooting
 
-**Backend won't start:**
-- Check DATABASE_URL in `.env`
-- Ensure PostgreSQL is running
-- Run `npx prisma generate` if Prisma errors
+**Backend won't start / DB Error:**
+- Ensure `DATABASE_URL` is pointing to the correct Neon DB string.
+- If getting JWT or Encryption errors, ensure your `.env` contains `JWT_SECRET` and `ENCRYPTION_KEK`.
 
-**Frontend proxy errors:**
-- Ensure backend is running on port 3001
-- Check `VITE_API_URL` in frontend `.env`
-
-**Login not working:**
-- Verify database is seeded: `npm run seed` in backend
-- Check backend logs for errors
+**Google Login Failed:**
+- Ensure `VITE_GOOGLE_CLIENT_ID` (frontend) and `GOOGLE_CLIENT_ID` (backend) exactly match your Google Cloud Console Client ID.
 
 ---
 
 ## 📄 License
 
 Private - Pre-seed Startup
-
----
-
-## 👤 Contact
-
-For issues or questions, contact the development team.

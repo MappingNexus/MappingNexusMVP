@@ -30,7 +30,7 @@ const AUTH_REFRESH_EXEMPT_PATHS = new Set([
 const TOKEN_KEY = 'nexus_access_token';
 const REFRESH_KEY = 'nexus_refresh_token';
 const USER_KEY = 'nexus_user';
-let companySecretMemory: string | null = null;
+const SECRET_KEY = 'nexus_company_secret';
 
 export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
 export function getUser(): UserProfile | null {
@@ -46,15 +46,15 @@ export function clearSession() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);
-    companySecretMemory = null;
+    localStorage.removeItem(SECRET_KEY);
 }
 
 export function setCompanySecret(secret: string) {
-    companySecretMemory = secret;
+    localStorage.setItem(SECRET_KEY, secret);
 }
 
 export function getCompanySecret(): string | null {
-    return companySecretMemory;
+    return localStorage.getItem(SECRET_KEY);
 }
 
 export function getErrorMessage(result: unknown, fallback: string): string {
@@ -174,6 +174,18 @@ export async function login(email: string, password: string, companySecret: stri
     const data = await request('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
+    });
+    if (data.success && data.session && data.user) {
+        setSession(data.session, data.user);
+        setCompanySecret(companySecret);
+    }
+    return data;
+}
+
+export async function loginWithGoogle(idToken: string, companySecret: string) {
+    const data = await request('/api/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ idToken }),
     });
     if (data.success && data.session && data.user) {
         setSession(data.session, data.user);
