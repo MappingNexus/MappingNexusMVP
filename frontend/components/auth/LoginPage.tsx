@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, ArrowRight, Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import PublicLayout from '../shared/PublicLayout';
 
 interface Props {
     onLogin: (email: string, password: string, companySecret: string) => Promise<{ success: boolean; message?: string }>;
+    onGoogleLogin: (idToken: string, companySecret: string) => Promise<{ success: boolean; message?: string }>;
 }
 
-const LoginPage: React.FC<Props> = ({ onLogin }) => {
+const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [companySecret, setCompanySecret] = useState('');
@@ -17,13 +19,13 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email || !password || !companySecret) { setError('All fields are required.'); return; }
 
+        // Standard Flow
+        if (!email || !password) { setError('Email and Password are required.'); return; }
         setLoading(true);
         setError('');
-
         try {
-            const result = await onLogin(email, password, companySecret);
+            const result = await onLogin(email, password, '');
             if (!result.success) {
                 setError(result.message || 'Invalid credentials.');
             }
@@ -31,6 +33,23 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
             setError('Connection failed. Is the backend running?');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+        if (credentialResponse.credential) {
+            setLoading(true);
+            setError('');
+            try {
+                const result = await onGoogleLogin(credentialResponse.credential, '');
+                if (!result.success) {
+                    setError(result.message || 'Google Login failed.');
+                }
+            } catch {
+                setError('Connection failed.');
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -52,6 +71,25 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
                 <div className="w-full bg-white/70 dark:bg-[#111111]/70 backdrop-blur-2xl rounded-3xl border border-white/60 dark:border-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.15)] dark:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)] p-8 sm:p-10 z-10 transition-transform hover:-translate-y-1 duration-500">
                     
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        
+                        {/* Google Sign In Button */}
+                        <div className="flex justify-center mb-6">
+                            <GoogleLogin
+                                onSuccess={handleGoogleSuccess}
+                                onError={() => setError('Google Sign In failed.')}
+                                useOneTap
+                                theme="outline"
+                                shape="pill"
+                                size="large"
+                            />
+                        </div>
+                        
+                        <div className="relative flex items-center py-2">
+                            <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                            <span className="flex-shrink-0 mx-4 text-gray-400 text-sm">or sign in with email</span>
+                            <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                        </div>
+
                         {/* Email */}
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Work Email</label>
@@ -86,22 +124,6 @@ const LoginPage: React.FC<Props> = ({ onLogin }) => {
                                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Company Secret */}
-                        <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">Tenant Secret</label>
-                                <span className="text-[10px] uppercase tracking-wider font-semibold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-full">Required</span>
-                            </div>
-                            <input
-                                type="password"
-                                value={companySecret}
-                                onChange={e => setCompanySecret(e.target.value)}
-                                className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
-                                placeholder="Provided by your HR Admin"
-                                disabled={loading}
-                            />
                         </div>
 
                         {/* Error Message */}

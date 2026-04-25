@@ -36,36 +36,37 @@ async function backfill() {
 
     let success = 0;
     let failed = 0;
+    const BATCH_SIZE = 50;
 
-    for (let i = 0; i < skills.length; i++) {
-        const skill = skills[i];
-        const skillName = skill.skill_name;
-        const proficiency = skill.proficiency || 'intermediate';
-        const pk = skill[pkCol];
+    for (let i = 0; i < skills.length; i += BATCH_SIZE) {
+        const batch = skills.slice(i, i + BATCH_SIZE);
 
-        try {
-            const embedding = await generateSkillEmbedding(skillName, proficiency);
+        await Promise.all(batch.map(async (skill) => {
+            const skillName = skill.skill_name;
+            const proficiency = skill.proficiency || 'intermediate';
+            const pk = skill[pkCol];
 
-            const { error: updateError } = await supabaseAdmin
-                .from('skills')
-                .update({ embedding: JSON.stringify(embedding) })
-                .eq(pkCol, pk);
+            try {
+                const embedding = await generateSkillEmbedding(skillName, proficiency);
 
-            if (updateError) {
-                console.error(`  ❌ ${skillName}: ${updateError.message}`);
+                const { error: updateError } = await supabaseAdmin
+                    .from('skills')
+                    .update({ embedding: JSON.stringify(embedding) })
+                    .eq(pkCol, pk);
+
+                if (updateError) {
+                    console.error(`  ❌ ${skillName}: ${updateError.message}`);
+                    failed++;
+                } else {
+                    success++;
+                }
+            } catch (err: any) {
+                console.error(`  ❌ ${skillName}: ${err.message}`);
                 failed++;
-            } else {
-                success++;
             }
+        }));
 
-            // Progress every 25 skills
-            if ((i + 1) % 25 === 0) {
-                console.log(`  📈 Progress: ${i + 1}/${skills.length} (${success} ok, ${failed} failed)`);
-            }
-        } catch (err: any) {
-            console.error(`  ❌ ${skillName}: ${err.message}`);
-            failed++;
-        }
+        console.log(`  📈 Progress: ${Math.min(i + BATCH_SIZE, skills.length)}/${skills.length} (${success} ok, ${failed} failed)`);
     }
 
     console.log(`\n✅ Backfill complete: ${success} embedded, ${failed} failed out of ${skills.length} total.`);

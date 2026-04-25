@@ -14,6 +14,9 @@
  */
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { verifyDatabaseConnection } from './config/db.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
@@ -32,6 +35,11 @@ import bulkImportRoutes from './routes/bulk-import.routes.js';
 import requestRoutes from './routes/requests.routes.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+const hasFrontendBuild = fs.existsSync(frontendIndexPath);
 
 process.on('unhandledRejection', (reason) => {
     console.error('Unhandled promise rejection:', reason);
@@ -90,11 +98,27 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ============================================================
+// FRONTEND HOSTING
+// ============================================================
+
+if (hasFrontendBuild) {
+    app.use(express.static(frontendDistPath));
+
+    app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
+        res.sendFile(frontendIndexPath);
+    });
+}
+
+// ============================================================
 // ERROR HANDLING
 // ============================================================
 
-app.use((_req, res) => {
+app.use('/api', (_req, res) => {
     res.status(404).json({ success: false, message: 'Endpoint not found.' });
+});
+
+app.use((_req, res) => {
+    res.status(404).json({ success: false, message: hasFrontendBuild ? 'Page not found.' : 'Frontend not deployed.' });
 });
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

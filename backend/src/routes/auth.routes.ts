@@ -14,8 +14,11 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { z } from 'zod';
+import { OAuth2Client } from 'google-auth-library';
 import { pool } from '../config/db.js';
 import { env } from '../config/env.js';
+
+const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 import { requireAuth, requireRole, AuthenticatedRequest, clearProfileCache } from '../middleware/auth.js';
 import { authLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { logAction, AuditActions } from '../services/audit.service.js';
@@ -30,6 +33,10 @@ const REFRESH_TOKEN_TTL = '30d';
 const loginSchema = z.object({
     email: z.string().trim().email(),
     password: z.string().min(1).max(256),
+});
+
+const googleAuthSchema = z.object({
+    idToken: z.string().min(1),
 });
 
 const changePasswordSchema = z.object({
@@ -124,6 +131,83 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
     } catch (err: any) {
         console.error('Login error:', err.message);
         return res.status(500).json({ success: false, message: 'Login service unavailable.' });
+    }
+});
+
+/**
+ * POST /api/auth/google
+ */
+router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Request, res: Response) => {
+    try {
+        const { idToken } = req.body;
+        
+        const ticket = await googleClient.verifyIdToken({
+            idToken,
+            audience: env.GOOGLE_CLIENT_ID,
+        });
+        
+        const payload = ticket.getPayload();
+        if (!payload || !payload.email) {
+            return res.status(401).json({ success: false, message: 'Invalid Google token.' });
+        }
+        
+        const normalizedEmail = payload.email.toLowerCase().trim();
+
+        // Fetch user with company info
+        const result = await pool.query(
+            `SELECT u.user_id, u.company_id, u.role, c.company_name
+             FROM public.users u
+             JOIN public.companies c ON c.company_id = u.company_id
+             WHERE u.email = $1
+             LIMIT 1`,
+            [normalizedEmail]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ success: false, message: 'No account found for this Google email. Contact your HR Admin.' });
+        }
+
+        const user = result.rows[0];
+
+        const accessToken = signAccessToken(user.user_id, normalizedEmail);
+        const refreshToken = signRefreshToken(user.user_id);
+
+        let employeeId: string | null = null;
+        if (user.role === 'employee') {
+            const empResult = await pool.query(
+                'SELECT employee_id FROM public.employees WHERE user_id = $1 AND is_archived = false LIMIT 1',
+                [user.user_id]
+            );
+            employeeId = empResult.rows[0]?.employee_id || null;
+        }
+
+        logAction({
+            actorId: user.user_id,
+            actorRole: user.role,
+            action: AuditActions.USER_LOGIN,
+            companyId: user.company_id,
+            metadata: { method: 'google_oauth' },
+        }).catch(() => {});
+
+        return res.json({
+            success: true,
+            session: {
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                expires_at: Math.floor(Date.now() / 1000) + 8 * 3600,
+            },
+            user: {
+                id: user.user_id,
+                email: normalizedEmail,
+                role: user.role,
+                companyId: user.company_id,
+                companyName: user.company_name,
+                employeeId,
+            },
+        });
+    } catch (err: any) {
+        console.error('Google Auth error:', err.message);
+        return res.status(401).json({ success: false, message: 'Google authentication failed.' });
     }
 });
 

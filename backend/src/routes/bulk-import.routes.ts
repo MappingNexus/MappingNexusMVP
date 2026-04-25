@@ -225,22 +225,21 @@ router.post('/', requireAuth, requireRole('hr'), async (req: Request, res: Respo
                 const skillNames = skillsRaw.split(';').map(s => s.trim()).filter(Boolean);
 
                 if (skillNames.length > 0) {
-                    const skillRows: any[] = [];
-                    for (const skillName of skillNames) {
+                    const skillRowsRowsRaw = await Promise.all(skillNames.map(async (skillName) => {
                         let embedding: number[] | null = null;
                         try {
                             embedding = await generateSkillEmbedding(skillName, 'intermediate');
                         } catch { /* non-fatal */ }
-                        skillRows.push({
+                        return {
                             employee_id: employee.employee_id,
                             company_id: user.companyId,
                             skill_name: skillName,
                             proficiency: 'intermediate',
                             last_used_date: new Date().toISOString().split('T')[0],
                             embedding: embedding ? JSON.stringify(embedding) : null,
-                        } as any);
-                    }
-                    await supabaseAdmin.from('skills').insert(skillRows);
+                        } as any;
+                    }));
+                    await supabaseAdmin.from('skills').insert(skillRowsRowsRaw);
                 }
 
                 const inviteResult = await sendPasswordSetupEmail(email);

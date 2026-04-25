@@ -122,6 +122,14 @@ function App() {
         return result;
     };
 
+    const handleGoogleLogin = async (idToken: string, companySecret: string) => {
+        const result = await api.loginWithGoogle(idToken, companySecret);
+        if (result.success && result.user) {
+            setUser(result.user);
+        }
+        return result;
+    };
+
     const handleLogout = () => {
         setUser(null);
         api.logout();
@@ -140,7 +148,7 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={
-                    user ? <RoleRedirect user={user} /> : <LoginPage onLogin={handleLogin} />
+                    user ? <RoleRedirect user={user} /> : <LoginPage onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} />
                 } />
                 <Route path="/change-password" element={<ChangePasswordPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />

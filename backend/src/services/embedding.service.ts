@@ -20,6 +20,8 @@ async function getEmbedder() {
     return pipeline;
 }
 
+const embeddingCache = new Map<string, number[]>();
+
 /**
  * Generate a 384-dim embedding for a skill description.
  * Enriches the skill_name with proficiency context for better semantic matching.
@@ -32,29 +34,35 @@ export async function generateSkillEmbedding(
     skillName: string,
     proficiency: string = 'intermediate'
 ): Promise<number[]> {
-    const embedder = await getEmbedder();
-
     // Enrich with context so "Python" understands it's programming, not the snake
     const text = `${skillName}, ${proficiency} level proficiency`;
 
+    if (embeddingCache.has(text)) {
+        return embeddingCache.get(text)!;
+    }
+
+    const embedder = await getEmbedder();
     const output = await embedder(text, { pooling: 'mean', normalize: true });
-    return Array.from(output.data as Float32Array);
+    const embedding = Array.from(output.data as Float32Array);
+    
+    // Keep a reasonable cache limit
+    if (embeddingCache.size < 10000) {
+        embeddingCache.set(text, embedding);
+    }
+    
+    return embedding;
 }
 
 /**
- * Generate embeddings for a batch of skills.
+ * Generate embeddings for a batch of skills independently in parallel.
  */
 export async function generateSkillEmbeddings(
     skills: { name: string; proficiency: string }[]
 ): Promise<{ name: string; embedding: number[] }[]> {
-    const results: { name: string; embedding: number[] }[] = [];
-
-    for (const skill of skills) {
+    return Promise.all(skills.map(async skill => {
         const embedding = await generateSkillEmbedding(skill.name, skill.proficiency);
-        results.push({ name: skill.name, embedding });
-    }
-
-    return results;
+        return { name: skill.name, embedding };
+    }));
 }
 
 /**
