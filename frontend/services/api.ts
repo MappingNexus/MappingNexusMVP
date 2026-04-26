@@ -20,6 +20,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
 const AUTH_REFRESH_EXEMPT_PATHS = new Set([
     '/api/auth/login',
     '/api/auth/forgot-password',
+    '/api/auth/reset-password',
     '/api/auth/refresh',
     '/api/auth/onboard-company',
     '/api/auth/invite-status',
@@ -205,6 +206,13 @@ export async function forgotPassword(email: string) {
     return request('/api/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
+    });
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+    return request('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword }),
     });
 }
 

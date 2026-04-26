@@ -5,7 +5,8 @@
  * POST /api/auth/onboard-company    — Create company + HR admin account
  * POST /api/auth/invite-user        — HR invites employee/manager
  * POST /api/auth/change-password    — Change password (authenticated)
- * POST /api/auth/forgot-password    — Send reset email (OTP/link via Gmail)
+ * POST /api/auth/forgot-password    — Send reset email with secure token link
+ * POST /api/auth/reset-password     — Validate token + set new password
  * POST /api/auth/refresh            — Refresh JWT using refresh token
  * GET  /api/auth/me                 — Get current user profile from token
  */
@@ -44,6 +45,13 @@ const changePasswordSchema = z.object({
     newPassword: z.string().min(8).max(256),
 });
 
+const resetPasswordSchema = z.object({
+    token: z.string().min(1, 'Reset token is required.'),
+    newPassword: z.string()
+        .min(8, 'Password must be at least 8 characters.')
+        .max(256, 'Password must be at most 256 characters.'),
+});
+
 const inviteSchema = z.object({
     email: z.string().trim().email(),
     role: z.enum(['manager', 'employee']),
@@ -51,12 +59,22 @@ const inviteSchema = z.object({
 });
 
 // ── Helpers ───────────────────────────────────────────────────
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 function signAccessToken(userId: string, email: string): string {
     return jwt.sign({ sub: userId, email }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 }
 
 function signRefreshToken(userId: string): string {
     return jwt.sign({ sub: userId, type: 'refresh' }, env.JWT_SECRET, { expiresIn: REFRESH_TOKEN_TTL });
+}
+
+/**
+ * Hash a reset token with SHA-256 for secure DB storage.
+ * We never store the raw token — only the hash.
+ */
+function hashResetToken(rawToken: string): string {
+    return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
 
 // ── Routes ────────────────────────────────────────────────────
@@ -469,8 +487,9 @@ router.post('/change-password', authLimiter, requireAuth, validate(changePasswor
 
 /**
  * POST /api/auth/forgot-password
- * Sends a temp password reset token to the user's email via Gmail.
- * (Simple OTP approach — no Supabase magic links needed)
+ * Generates a secure, time-limited, single-use reset token.
+ * Stores only the SHA-256 hash of the token in the DB.
+ * Sends the raw token to the user's email as a reset link.
  */
 router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: Response) => {
     // Always return success to avoid user enumeration
@@ -487,25 +506,29 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
         );
 
         if (result.rows.length === 0) {
+            // No user found — return safe response (prevent enumeration)
             return res.json(SAFE_RESPONSE);
         }
 
-        // Generate a short-lived reset token
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+        // Generate a cryptographically secure reset token
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = hashResetToken(rawToken);
+        const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS); // 1 hour
 
+        // Store only the HASH + mark as unused
         await pool.query(
-            `UPDATE public.users SET reset_token = $1, reset_token_expires = $2 WHERE user_id = $3`,
-            [resetToken, expiresAt, result.rows[0].user_id]
+            `UPDATE public.users
+             SET reset_token = $1, reset_token_expires = $2, reset_token_used = false
+             WHERE user_id = $3`,
+            [tokenHash, expiresAt, result.rows[0].user_id]
         );
 
-        // In dev — just log the token. In prod — send email via Gmail.
-        const resetUrl = `${env.FRONTEND_URL || 'http://localhost:5173'}/change-password?token=${resetToken}`;
+        // Build reset URL with the RAW token (user-facing)
+        const resetUrl = `${env.FRONTEND_URL || 'http://localhost:5173'}/change-password?token=${rawToken}`;
 
         if (env.IS_DEV) {
             console.log(`\n🔑 Password reset token for ${normalizedEmail}:\n   ${resetUrl}\n`);
         } else {
-            // Email sending — uses Gmail service from email.service.ts
             const { sendPasswordResetEmail } = await import('../services/email.service.js');
             await sendPasswordResetEmail(normalizedEmail, resetUrl);
         }
@@ -514,6 +537,80 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
     } catch (err: any) {
         console.error('Forgot password error:', err.message);
         return res.json(SAFE_RESPONSE);
+    }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Validates the reset token (hash comparison), checks expiry and reuse,
+ * then updates the password and invalidates the token.
+ */
+router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchema), async (req: Request, res: Response) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        // Hash the incoming raw token to compare against stored hash
+        const tokenHash = hashResetToken(token);
+
+        // Look up user by hashed token
+        const result = await pool.query(
+            `SELECT user_id, company_id, role, reset_token_expires, reset_token_used
+             FROM public.users
+             WHERE reset_token = $1
+             LIMIT 1`,
+            [tokenHash]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid or expired reset link. Please request a new one.',
+            });
+        }
+
+        const user = result.rows[0];
+
+        // Check if token was already used (single-use enforcement)
+        if (user.reset_token_used) {
+            return res.status(400).json({
+                success: false,
+                message: 'This reset link has already been used. Please request a new one.',
+            });
+        }
+
+        // Check if token has expired
+        if (!user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+            return res.status(400).json({
+                success: false,
+                message: 'This reset link has expired. Please request a new one.',
+            });
+        }
+
+        // All checks passed — update the password
+        const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+        await pool.query(
+            `UPDATE public.users
+             SET password_hash = $1,
+                 reset_token_used = true
+             WHERE user_id = $2`,
+            [newHash, user.user_id]
+        );
+
+        clearProfileCache(user.user_id);
+
+        logAction({
+            actorId: user.user_id,
+            actorRole: user.role,
+            action: AuditActions.PASSWORD_CHANGED,
+            companyId: user.company_id,
+            metadata: { method: 'reset_token' },
+        }).catch(() => {});
+
+        return res.json({ success: true, message: 'Password has been reset successfully. You can now sign in.' });
+    } catch (err: any) {
+        console.error('Reset password error:', err.message);
+        return res.status(500).json({ success: false, message: 'Password reset failed. Please try again.' });
     }
 });
 
