@@ -131,8 +131,7 @@ function App() {
     };
 
     const handleLogout = () => {
-        setUser(null);
-        api.logout();
+        void api.logout().finally(() => setUser(null));
     };
 
     if (loading) {
