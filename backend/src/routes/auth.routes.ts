@@ -27,8 +27,9 @@ import { validate } from '../utils/validation.js';
 
 const router = Router();
 const SALT_ROUNDS = 12;
-const ACCESS_TOKEN_TTL = '8h';
-const REFRESH_TOKEN_TTL = '30d';
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_TTL = '7d';
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
 // ── Schemas ──────────────────────────────────────────────────
 const loginSchema = z.object({
@@ -59,22 +60,43 @@ const inviteSchema = z.object({
 });
 
 // ── Helpers ───────────────────────────────────────────────────
-const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const RESET_TOKEN_TTL_MS_FORGOT = 60 * 60 * 1000; // 1 hour
 
 function signAccessToken(userId: string, email: string): string {
     return jwt.sign({ sub: userId, email }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 }
 
-function signRefreshToken(userId: string): string {
-    return jwt.sign({ sub: userId, type: 'refresh' }, env.JWT_SECRET, { expiresIn: REFRESH_TOKEN_TTL });
+/**
+ * Hash a token with SHA-256 for secure DB storage.
+ * Used for both reset tokens and refresh tokens — we never store raw values.
+ */
+function hashToken(rawToken: string): string {
+    return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
 
 /**
- * Hash a reset token with SHA-256 for secure DB storage.
- * We never store the raw token — only the hash.
+ * Generate a cryptographically secure refresh token, store its hash in DB,
+ * and return the raw token to send to the client.
  */
-function hashResetToken(rawToken: string): string {
-    return crypto.createHash('sha256').update(rawToken).digest('hex');
+async function createRefreshSession(
+    userId: string,
+    req: Request
+): Promise<{ rawToken: string; sessionId: string }> {
+    const rawToken = crypto.randomBytes(48).toString('hex');
+    const tokenHash = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    const userAgent = req.headers['user-agent'] || null;
+    const ip = req.ip || req.socket.remoteAddress || null;
+
+    const result = await pool.query(
+        `INSERT INTO public.refresh_token_sessions
+             (user_id, token_hash, expires_at, user_agent, ip_address)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING session_id`,
+        [userId, tokenHash, expiresAt, userAgent, ip]
+    );
+
+    return { rawToken, sessionId: result.rows[0].session_id };
 }
 
 // ── Routes ────────────────────────────────────────────────────
@@ -110,7 +132,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
         }
 
         const accessToken = signAccessToken(user.user_id, normalizedEmail);
-        const refreshToken = signRefreshToken(user.user_id);
+        const { rawToken: refreshToken } = await createRefreshSession(user.user_id, req);
 
         // Get employee_id if role is employee
         let employeeId: string | null = null;
@@ -135,7 +157,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
             session: {
                 access_token: accessToken,
                 refresh_token: refreshToken,
-                expires_at: Math.floor(Date.now() / 1000) + 8 * 3600,
+                expires_at: Math.floor(Date.now() / 1000) + 15 * 60,
             },
             user: {
                 id: user.user_id,
@@ -188,7 +210,7 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
         const user = result.rows[0];
 
         const accessToken = signAccessToken(user.user_id, normalizedEmail);
-        const refreshToken = signRefreshToken(user.user_id);
+        const { rawToken: refreshToken } = await createRefreshSession(user.user_id, req);
 
         let employeeId: string | null = null;
         if (user.role === 'employee') {
@@ -212,7 +234,7 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
             session: {
                 access_token: accessToken,
                 refresh_token: refreshToken,
-                expires_at: Math.floor(Date.now() / 1000) + 8 * 3600,
+                expires_at: Math.floor(Date.now() / 1000) + 15 * 60,
             },
             user: {
                 id: user.user_id,
@@ -231,45 +253,155 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
 
 /**
  * POST /api/auth/refresh
+ *
+ * Secure refresh token rotation:
+ *   1. Hash the incoming raw token, look it up in refresh_token_sessions
+ *   2. If found AND already revoked → replay attack detected → revoke ALL sessions for that user
+ *   3. If found AND valid → issue new access + refresh tokens, revoke old session
+ *   4. Return new tokens to client
  */
 router.post('/refresh', async (req: Request, res: Response) => {
+    const client = await pool.connect();
     try {
         const { refresh_token } = req.body;
         if (!refresh_token) {
             return res.status(400).json({ success: false, message: 'Refresh token required.' });
         }
 
-        let payload: any;
-        try {
-            payload = jwt.verify(refresh_token, env.JWT_SECRET);
-        } catch {
+        const tokenHash = hashToken(refresh_token);
+
+        // Look up the session by token hash
+        const sessionResult = await client.query(
+            `SELECT s.session_id, s.user_id, s.revoked, s.expires_at, s.replaced_by,
+                    u.email, u.role, u.company_id
+             FROM public.refresh_token_sessions s
+             JOIN public.users u ON u.user_id = s.user_id
+             WHERE s.token_hash = $1
+             LIMIT 1`,
+            [tokenHash]
+        );
+
+        if (sessionResult.rows.length === 0) {
             return res.status(401).json({ success: false, message: 'Invalid refresh token.' });
         }
 
-        if (payload.type !== 'refresh') {
-            return res.status(401).json({ success: false, message: 'Invalid token type.' });
+        const session = sessionResult.rows[0];
+
+        // ── REPLAY ATTACK DETECTION ─────────────────────────────
+        // If this token was already revoked, someone is reusing a stolen token.
+        // Revoke ALL sessions for this user as a safety measure.
+        if (session.revoked) {
+            await client.query(
+                `UPDATE public.refresh_token_sessions
+                 SET revoked = true
+                 WHERE user_id = $1 AND revoked = false`,
+                [session.user_id]
+            );
+
+            console.error(
+                `🚨 REFRESH TOKEN REPLAY DETECTED: user=${session.user_id} session=${session.session_id}. All sessions revoked.`
+            );
+
+            logAction({
+                actorId: session.user_id,
+                actorRole: session.role,
+                action: 'refresh_token_replay_detected',
+                companyId: session.company_id,
+                metadata: { severity: 'CRITICAL', sessionId: session.session_id },
+            }).catch(() => {});
+
+            return res.status(401).json({
+                success: false,
+                message: 'Security violation detected. All sessions have been revoked. Please log in again.',
+            });
         }
 
-        const result = await pool.query(
-            'SELECT email FROM public.users WHERE user_id = $1 LIMIT 1',
-            [payload.sub]
+        // ── EXPIRY CHECK ────────────────────────────────────────
+        if (new Date(session.expires_at) < new Date()) {
+            // Mark as revoked for cleanliness
+            await client.query(
+                'UPDATE public.refresh_token_sessions SET revoked = true WHERE session_id = $1',
+                [session.session_id]
+            );
+            return res.status(401).json({ success: false, message: 'Refresh token expired. Please log in again.' });
+        }
+
+        // ── ROTATE: revoke old token + issue new pair ────────────
+        await client.query('BEGIN');
+
+        // Create the new refresh session first
+        const { rawToken: newRefreshToken, sessionId: newSessionId } =
+            await (async () => {
+                const raw = crypto.randomBytes(48).toString('hex');
+                const hash = hashToken(raw);
+                const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+                const userAgent = req.headers['user-agent'] || null;
+                const ip = req.ip || req.socket.remoteAddress || null;
+
+                const r = await client.query(
+                    `INSERT INTO public.refresh_token_sessions
+                         (user_id, token_hash, expires_at, user_agent, ip_address)
+                     VALUES ($1, $2, $3, $4, $5)
+                     RETURNING session_id`,
+                    [session.user_id, hash, expiresAt, userAgent, ip]
+                );
+                return { rawToken: raw, sessionId: r.rows[0].session_id };
+            })();
+
+        // Revoke the old session and link it to the new one
+        await client.query(
+            `UPDATE public.refresh_token_sessions
+             SET revoked = true, replaced_by = $1
+             WHERE session_id = $2`,
+            [newSessionId, session.session_id]
         );
 
-        if (result.rows.length === 0) {
-            return res.status(401).json({ success: false, message: 'User not found.' });
-        }
+        await client.query('COMMIT');
 
-        const newAccessToken = signAccessToken(payload.sub, result.rows[0].email);
+        // Issue new access token
+        const newAccessToken = signAccessToken(session.user_id, session.email);
 
         return res.json({
             success: true,
             session: {
                 access_token: newAccessToken,
-                expires_at: Math.floor(Date.now() / 1000) + 8 * 3600,
+                refresh_token: newRefreshToken,
+                expires_at: Math.floor(Date.now() / 1000) + 15 * 60,
             },
         });
     } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('Token refresh error:', err.message);
         return res.status(500).json({ success: false, message: 'Token refresh failed.' });
+    } finally {
+        client.release();
+    }
+});
+
+/**
+ * POST /api/auth/logout
+ * Revokes the refresh token session on the server side.
+ */
+router.post('/logout', async (req: Request, res: Response) => {
+    try {
+        const { refresh_token } = req.body;
+        if (!refresh_token) {
+            return res.json({ success: true, message: 'Logged out.' });
+        }
+
+        const tokenHash = hashToken(refresh_token);
+
+        await pool.query(
+            `UPDATE public.refresh_token_sessions
+             SET revoked = true
+             WHERE token_hash = $1 AND revoked = false`,
+            [tokenHash]
+        );
+
+        return res.json({ success: true, message: 'Session revoked.' });
+    } catch (err: any) {
+        console.error('Logout error:', err.message);
+        return res.json({ success: true, message: 'Logged out.' });
     }
 });
 
@@ -512,8 +644,8 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
 
         // Generate a cryptographically secure reset token
         const rawToken = crypto.randomBytes(32).toString('hex');
-        const tokenHash = hashResetToken(rawToken);
-        const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS); // 1 hour
+        const tokenHash = hashToken(rawToken);
+        const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS_FORGOT); // 1 hour
 
         // Store only the HASH + mark as unused
         await pool.query(
@@ -550,7 +682,7 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
         const { token, newPassword } = req.body;
 
         // Hash the incoming raw token to compare against stored hash
-        const tokenHash = hashResetToken(token);
+        const tokenHash = hashToken(token);
 
         // Look up user by hashed token
         const result = await pool.query(

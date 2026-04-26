@@ -141,6 +141,67 @@ async function parseResponse<T>(response: Response): Promise<T> {
     }
 }
 
+// ============ Refresh Queue / Lock Pattern ============
+// When multiple requests get 401 at the same time, only ONE refresh
+// request is made. All other callers wait on the same promise.
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Attempt to refresh tokens. Uses a lock so concurrent calls
+ * coalesce into a single network request.
+ */
+async function refreshTokenWithLock(): Promise<boolean> {
+    if (isRefreshing && refreshPromise) {
+        // Another call is already refreshing — piggyback on it
+        return refreshPromise;
+    }
+
+    isRefreshing = true;
+    refreshPromise = _doRefresh();
+
+    try {
+        return await refreshPromise;
+    } finally {
+        isRefreshing = false;
+        refreshPromise = null;
+    }
+}
+
+/**
+ * Internal: calls /api/auth/refresh directly via fetch (NOT through
+ * the request() wrapper) to avoid triggering the 401 interceptor loop.
+ */
+async function _doRefresh(): Promise<boolean> {
+    const rt = localStorage.getItem(REFRESH_KEY);
+    if (!rt) return false;
+
+    try {
+        const response = await fetch(`${API}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: rt }),
+        });
+
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        if (data.success && data.session) {
+            localStorage.setItem(TOKEN_KEY, data.session.access_token);
+            // Rotation: server sends a NEW refresh token each time
+            if (data.session.refresh_token) {
+                localStorage.setItem(REFRESH_KEY, data.session.refresh_token);
+            }
+            return true;
+        }
+    } catch {
+        // Network error during refresh — treat as failure
+    }
+
+    return false;
+}
+
 async function request<T = any>(path: string, options?: RequestInit): Promise<T> {
     const url = `${API}${path}`;
 
@@ -149,8 +210,9 @@ async function request<T = any>(path: string, options?: RequestInit): Promise<T>
 
         // Auto-refresh on 401 for authenticated routes only.
         if (response.status === 401 && !AUTH_REFRESH_EXEMPT_PATHS.has(path)) {
-            const refreshed = await refreshToken();
+            const refreshed = await refreshTokenWithLock();
             if (refreshed) {
+                // Retry the original request with the fresh access token
                 response = await fetchWithTimeout(url, options);
             } else {
                 clearSession();
@@ -228,21 +290,9 @@ export async function onboardCompany(data: {
     });
 }
 
+/** Public wrapper — delegates to the lock-based implementation. */
 export async function refreshToken(): Promise<boolean> {
-    const rt = localStorage.getItem(REFRESH_KEY);
-    if (!rt) return false;
-    try {
-        const data = await request('/api/auth/refresh', {
-            method: 'POST',
-            body: JSON.stringify({ refresh_token: rt }),
-        });
-        if (data.success && data.session) {
-            localStorage.setItem(TOKEN_KEY, data.session.access_token);
-            localStorage.setItem(REFRESH_KEY, data.session.refresh_token);
-            return true;
-        }
-    } catch {}
-    return false;
+    return refreshTokenWithLock();
 }
 
 export async function getMe() {
@@ -254,6 +304,15 @@ export async function getInviteStatus() {
 }
 
 export function logout() {
+    // Best-effort: tell backend to revoke the refresh session
+    const rt = localStorage.getItem(REFRESH_KEY);
+    if (rt) {
+        fetch(`${API}/api/auth/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: rt }),
+        }).catch(() => {});
+    }
     clearSession();
     window.location.href = '/login';
 }
