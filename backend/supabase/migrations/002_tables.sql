@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE public.users IS 'Maps Supabase auth.users to company + role. One record per auth user. Role is immutable after creation.';
+COMMENT ON TABLE public.users IS 'Maps Supabase auth.users to company + role. One record per auth user. Sensitive role changes must revoke sessions.';
 
 -- ============================================================
 -- 3. EMPLOYEES

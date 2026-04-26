@@ -80,9 +80,28 @@ CREATE TABLE IF NOT EXISTS public.users (
     company_id            uuid NOT NULL REFERENCES public.companies(company_id) ON DELETE RESTRICT,
     role                  user_role NOT NULL DEFAULT 'employee',
     status                user_status NOT NULL DEFAULT 'active',
+    token_version         integer NOT NULL DEFAULT 0 CHECK (token_version >= 0),
     reset_token           text,
     reset_token_expires   timestamptz,
+    reset_token_used      boolean NOT NULL DEFAULT false,
     created_at            timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE: refresh_token_sessions
+-- Refresh tokens are stored only as SHA-256 hashes and rotated on use.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.refresh_token_sessions (
+    session_id      uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         uuid NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
+    token_hash      text NOT NULL,
+    expires_at      timestamptz NOT NULL,
+    revoked         boolean NOT NULL DEFAULT false,
+    replaced_by     uuid,
+    user_agent      text,
+    ip_address      inet,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    last_used_at    timestamptz NOT NULL DEFAULT now()
 );
 
 -- ============================================================
@@ -316,6 +335,17 @@ CREATE INDEX IF NOT EXISTS idx_users_company_id           ON public.users(compan
 CREATE INDEX IF NOT EXISTS idx_users_email                ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_status               ON public.users(status);
 CREATE INDEX IF NOT EXISTS idx_users_company_status       ON public.users(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_users_reset_token          ON public.users(reset_token)
+    WHERE reset_token IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_refresh_sessions_token_hash
+    ON public.refresh_token_sessions(token_hash)
+    WHERE revoked = false;
+CREATE INDEX IF NOT EXISTS idx_refresh_sessions_user_id
+    ON public.refresh_token_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expires
+    ON public.refresh_token_sessions(expires_at)
+    WHERE revoked = false;
 
 CREATE INDEX IF NOT EXISTS idx_employees_company_id        ON public.employees(company_id);
 CREATE INDEX IF NOT EXISTS idx_employees_user_id           ON public.employees(user_id);

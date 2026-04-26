@@ -23,6 +23,7 @@ const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 import { requireAuth, requireRole, AuthenticatedRequest, clearProfileCache } from '../middleware/auth.js';
 import { authLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { logAction, AuditActions } from '../services/audit.service.js';
+import { revokeAllSessionsForUser } from '../services/session.service.js';
 import { validate } from '../utils/validation.js';
 
 const router = Router();
@@ -62,8 +63,8 @@ const inviteSchema = z.object({
 // ── Helpers ───────────────────────────────────────────────────
 const RESET_TOKEN_TTL_MS_FORGOT = 60 * 60 * 1000; // 1 hour
 
-function signAccessToken(userId: string, email: string): string {
-    return jwt.sign({ sub: userId, email }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+function signAccessToken(userId: string, email: string, tokenVersion: number): string {
+    return jwt.sign({ sub: userId, email, tokenVersion }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 }
 
 function accountStatusMessage(status: string): string {
@@ -124,7 +125,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
 
         // Fetch user with company info
         const result = await pool.query(
-            `SELECT u.user_id, u.password_hash, u.company_id, u.role, u.status,
+            `SELECT u.user_id, u.password_hash, u.company_id, u.role, u.status, u.token_version,
                     c.company_name
              FROM public.users u
              JOIN public.companies c ON c.company_id = u.company_id
@@ -148,7 +149,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
             return res.status(401).json({ success: false, message: accountStatusMessage(user.status) });
         }
 
-        const accessToken = signAccessToken(user.user_id, normalizedEmail);
+        const accessToken = signAccessToken(user.user_id, normalizedEmail, user.token_version);
         const { rawToken: refreshToken } = await createRefreshSession(user.user_id, req);
 
         // Get employee_id if role is employee
@@ -213,7 +214,7 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
 
         // Fetch user with company info
         const result = await pool.query(
-            `SELECT u.user_id, u.company_id, u.role, u.status, c.company_name
+            `SELECT u.user_id, u.company_id, u.role, u.status, u.token_version, c.company_name
              FROM public.users u
              JOIN public.companies c ON c.company_id = u.company_id
              WHERE u.email = $1
@@ -231,7 +232,7 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
             return res.status(401).json({ success: false, message: accountStatusMessage(user.status) });
         }
 
-        const accessToken = signAccessToken(user.user_id, normalizedEmail);
+        const accessToken = signAccessToken(user.user_id, normalizedEmail, user.token_version);
         const { rawToken: refreshToken } = await createRefreshSession(user.user_id, req);
 
         let employeeId: string | null = null;
@@ -296,7 +297,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
         // Look up the session by token hash
         const sessionResult = await client.query(
             `SELECT s.session_id, s.user_id, s.revoked, s.expires_at, s.replaced_by,
-                    u.email, u.role, u.company_id, u.status
+                    u.email, u.role, u.company_id, u.status, u.token_version
              FROM public.refresh_token_sessions s
              JOIN public.users u ON u.user_id = s.user_id
              WHERE s.token_hash = $1
@@ -318,12 +319,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
         // If this token was already revoked, someone is reusing a stolen token.
         // Revoke ALL sessions for this user as a safety measure.
         if (session.revoked) {
-            await client.query(
-                `UPDATE public.refresh_token_sessions
-                 SET revoked = true
-                 WHERE user_id = $1 AND revoked = false`,
-                [session.user_id]
-            );
+            await revokeAllSessionsForUser(session.user_id, client);
 
             console.error(
                 `🚨 REFRESH TOKEN REPLAY DETECTED: user=${session.user_id} session=${session.session_id}. All sessions revoked.`
@@ -386,7 +382,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
         await client.query('COMMIT');
 
         // Issue new access token
-        const newAccessToken = signAccessToken(session.user_id, session.email);
+        const newAccessToken = signAccessToken(session.user_id, session.email, session.token_version);
 
         return res.json({
             success: true,
@@ -607,28 +603,36 @@ router.post('/invite-user', authLimiter, requireAuth, requireRole('hr'), validat
 router.post('/change-password', authLimiter, requireAuth, validate(changePasswordSchema), async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
     const { currentPassword, newPassword } = req.body;
+    const client = await pool.connect();
 
     try {
-        const result = await pool.query(
-            'SELECT password_hash FROM public.users WHERE user_id = $1',
+        await client.query('BEGIN');
+
+        const result = await client.query(
+            'SELECT password_hash FROM public.users WHERE user_id = $1 FOR UPDATE',
             [user.userId]
         );
 
         if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
         const valid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
         if (!valid) {
+            await client.query('ROLLBACK');
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
 
         const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-        await pool.query(
+        await client.query(
             'UPDATE public.users SET password_hash = $1 WHERE user_id = $2',
             [newHash, user.userId]
         );
 
+        const revokedSessions = await revokeAllSessionsForUser(user.userId, client);
+
+        await client.query('COMMIT');
         clearProfileCache(user.userId);
 
         logAction({
@@ -636,12 +640,21 @@ router.post('/change-password', authLimiter, requireAuth, validate(changePasswor
             actorRole: user.role,
             action: AuditActions.PASSWORD_CHANGED,
             companyId: user.companyId,
+            metadata: { revokedSessions, currentSessionRevoked: true },
         }).catch(() => {});
 
-        return res.json({ success: true, message: 'Password updated successfully.' });
+        return res.json({
+            success: true,
+            message: 'Password updated successfully. Please log in again.',
+            revokedSessions,
+            currentSessionRevoked: true,
+        });
     } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error('Change password error:', err.message);
         return res.status(500).json({ success: false, message: 'Password change failed.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -706,22 +719,28 @@ router.post('/forgot-password', passwordResetLimiter, async (req: Request, res: 
  * then updates the password and invalidates the token.
  */
 router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchema), async (req: Request, res: Response) => {
+    const client = await pool.connect();
+
     try {
         const { token, newPassword } = req.body;
 
         // Hash the incoming raw token to compare against stored hash
         const tokenHash = hashToken(token);
 
+        await client.query('BEGIN');
+
         // Look up user by hashed token
-        const result = await pool.query(
+        const result = await client.query(
             `SELECT user_id, company_id, role, reset_token_expires, reset_token_used
              FROM public.users
              WHERE reset_token = $1
-             LIMIT 1`,
+             LIMIT 1
+             FOR UPDATE`,
             [tokenHash]
         );
 
         if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
                 message: 'Invalid or expired reset link. Please request a new one.',
@@ -732,6 +751,7 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
 
         // Check if token was already used (single-use enforcement)
         if (user.reset_token_used) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
                 message: 'This reset link has already been used. Please request a new one.',
@@ -740,6 +760,7 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
 
         // Check if token has expired
         if (!user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+            await client.query('ROLLBACK');
             return res.status(400).json({
                 success: false,
                 message: 'This reset link has expired. Please request a new one.',
@@ -749,7 +770,7 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
         // All checks passed — update the password
         const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-        await pool.query(
+        await client.query(
             `UPDATE public.users
              SET password_hash = $1,
                  reset_token_used = true
@@ -757,6 +778,9 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
             [newHash, user.user_id]
         );
 
+        const revokedSessions = await revokeAllSessionsForUser(user.user_id, client);
+
+        await client.query('COMMIT');
         clearProfileCache(user.user_id);
 
         logAction({
@@ -764,13 +788,16 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
             actorRole: user.role,
             action: AuditActions.PASSWORD_CHANGED,
             companyId: user.company_id,
-            metadata: { method: 'reset_token' },
+            metadata: { method: 'reset_token', revokedSessions, currentSessionRevoked: true },
         }).catch(() => {});
 
         return res.json({ success: true, message: 'Password has been reset successfully. You can now sign in.' });
     } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error('Reset password error:', err.message);
         return res.status(500).json({ success: false, message: 'Password reset failed. Please try again.' });
+    } finally {
+        client.release();
     }
 });
 

@@ -22,6 +22,7 @@ export interface AuthenticatedRequest extends Request {
         companyId: string;
         role: 'hr' | 'manager' | 'employee';
         status: 'active' | 'suspended' | 'deactivated' | 'offboarded';
+        tokenVersion: number;
     };
 }
 
@@ -82,7 +83,7 @@ export const requireAuth = async (
 
     try {
         const result = await pool.query(
-            'SELECT company_id, role, status FROM public.users WHERE user_id = $1 LIMIT 1',
+            'SELECT company_id, role, status, token_version FROM public.users WHERE user_id = $1 LIMIT 1',
             [userId]
         );
 
@@ -103,6 +104,15 @@ export const requireAuth = async (
             return;
         }
 
+        const payloadTokenVersion = typeof payload.tokenVersion === 'number' ? payload.tokenVersion : 0;
+        if (payloadTokenVersion !== profile.token_version) {
+            res.status(401).json({
+                success: false,
+                message: 'Session expired. Please log in again.',
+            });
+            return;
+        }
+
         const authReq = req as AuthenticatedRequest;
         authReq.user = {
             userId,
@@ -110,6 +120,7 @@ export const requireAuth = async (
             companyId: profile.company_id,
             role: profile.role,
             status: profile.status,
+            tokenVersion: profile.token_version,
         };
 
         next();

@@ -303,18 +303,24 @@ export async function getInviteStatus() {
     return request<{ success: boolean; configured: boolean; message: string }>('/api/auth/invite-status');
 }
 
-export function logout() {
-    // Best-effort: tell backend to revoke the refresh session
+export async function logout(): Promise<void> {
+    // Best-effort: tell backend to revoke the refresh session before local cleanup.
     const rt = localStorage.getItem(REFRESH_KEY);
-    if (rt) {
-        fetch(`${API}/api/auth/logout`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: rt }),
-        }).catch(() => {});
+
+    try {
+        if (rt) {
+            await fetch(`${API}/api/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: rt }),
+            });
+        }
+    } catch {
+        // Logout must still complete locally even if the revoke call fails.
+    } finally {
+        clearSession();
+        window.location.href = '/login';
     }
-    clearSession();
-    window.location.href = '/login';
 }
 
 // ============ Employees ============
