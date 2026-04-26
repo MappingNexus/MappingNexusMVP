@@ -21,27 +21,27 @@ export interface AuthenticatedRequest extends Request {
         email: string;
         companyId: string;
         role: 'hr' | 'manager' | 'employee';
+        status: 'active' | 'suspended' | 'deactivated' | 'offboarded';
     };
 }
 
 // In-memory profile cache (30s TTL) — avoids DB hit on every request
-const profileCache = new Map<string, { profile: any; expiry: number }>();
-const CACHE_TTL_MS = 30 * 1000;
-
-function getCachedProfile(userId: string) {
-    const entry = profileCache.get(userId);
-    if (entry && entry.expiry > Date.now()) return entry.profile;
-    profileCache.delete(userId);
-    return null;
+function accountStatusMessage(status: string): string {
+    switch (status) {
+        case 'suspended':
+            return 'Account suspended.';
+        case 'deactivated':
+            return 'Account deactivated.';
+        case 'offboarded':
+            return 'Account offboarded.';
+        default:
+            return 'Account inactive.';
+    }
 }
 
-function setCachedProfile(userId: string, profile: any) {
-    profileCache.set(userId, { profile, expiry: Date.now() + CACHE_TTL_MS });
-}
-
-/** Call this on password change, role change, or account termination */
+/** Compatibility hook for callers that previously cleared cached auth profiles. */
 export function clearProfileCache(userId: string) {
-    profileCache.delete(userId);
+    void userId;
 }
 
 /**
@@ -81,25 +81,26 @@ export const requireAuth = async (
     }
 
     try {
-        // Check cache first
-        let profile = getCachedProfile(userId);
+        const result = await pool.query(
+            'SELECT company_id, role, status FROM public.users WHERE user_id = $1 LIMIT 1',
+            [userId]
+        );
 
-        if (!profile) {
-            const result = await pool.query(
-                'SELECT company_id, role FROM public.users WHERE user_id = $1 LIMIT 1',
-                [userId]
-            );
+        if (result.rows.length === 0) {
+            res.status(403).json({
+                success: false,
+                message: 'User profile not found. Contact your HR administrator.',
+            });
+            return;
+        }
 
-            if (result.rows.length === 0) {
-                res.status(403).json({
-                    success: false,
-                    message: 'User profile not found. Contact your HR administrator.',
-                });
-                return;
-            }
-
-            profile = result.rows[0];
-            setCachedProfile(userId, profile);
+        const profile = result.rows[0];
+        if (profile.status !== 'active') {
+            res.status(401).json({
+                success: false,
+                message: accountStatusMessage(profile.status),
+            });
+            return;
         }
 
         const authReq = req as AuthenticatedRequest;
@@ -108,6 +109,7 @@ export const requireAuth = async (
             email: payload.email || '',
             companyId: profile.company_id,
             role: profile.role,
+            status: profile.status,
         };
 
         next();

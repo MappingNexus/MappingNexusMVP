@@ -26,6 +26,10 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
+    CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deactivated', 'offboarded');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
     CREATE TYPE seniority_level AS ENUM ('junior', 'mid', 'senior', 'lead', 'principal');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -75,6 +79,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     password_hash         text NOT NULL,
     company_id            uuid NOT NULL REFERENCES public.companies(company_id) ON DELETE RESTRICT,
     role                  user_role NOT NULL DEFAULT 'employee',
+    status                user_status NOT NULL DEFAULT 'active',
     reset_token           text,
     reset_token_expires   timestamptz,
     created_at            timestamptz NOT NULL DEFAULT now()
@@ -309,6 +314,8 @@ CREATE TRIGGER projects_updated_at
 
 CREATE INDEX IF NOT EXISTS idx_users_company_id           ON public.users(company_id);
 CREATE INDEX IF NOT EXISTS idx_users_email                ON public.users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status               ON public.users(status);
+CREATE INDEX IF NOT EXISTS idx_users_company_status       ON public.users(company_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_employees_company_id        ON public.employees(company_id);
 CREATE INDEX IF NOT EXISTS idx_employees_user_id           ON public.employees(user_id);

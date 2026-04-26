@@ -43,6 +43,10 @@ export const AuditActions = {
     // Auth
     USER_LOGIN: 'user_login',
     USER_CREATED: 'user_created',
+    USER_SUSPENDED: 'user_suspended',
+    USER_DEACTIVATED: 'user_deactivated',
+    USER_OFFBOARDED: 'user_offboarded',
+    USER_REACTIVATED: 'user_reactivated',
     PASSWORD_CHANGED: 'password_changed',
     INVITE_RESENT: 'invite_resent',
 
@@ -145,7 +149,8 @@ function sanitizeMetadata(meta: Record<string, any>): Record<string, any> {
         'teamId', 'team_id', 'teamName', 'team_name',
         'role', 'action', 'count', 'filename',
         'managerId', 'manager_id',
-        'status', 'reason', 'note',
+        'status', 'previousStatus', 'reason', 'note',
+        'revokedSessions',
         'skillsRequested', 'matchCount', 'filtersApplied',
         'assignmentId', 'projectId',
         'candidatesScanned', 'topMatchScore', 'aiEnhanced', 'searchMethod',

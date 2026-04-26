@@ -66,6 +66,19 @@ function signAccessToken(userId: string, email: string): string {
     return jwt.sign({ sub: userId, email }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 }
 
+function accountStatusMessage(status: string): string {
+    switch (status) {
+        case 'suspended':
+            return 'Account suspended.';
+        case 'deactivated':
+            return 'Account deactivated.';
+        case 'offboarded':
+            return 'Account offboarded.';
+        default:
+            return 'Account inactive.';
+    }
+}
+
 /**
  * Hash a token with SHA-256 for secure DB storage.
  * Used for both reset tokens and refresh tokens — we never store raw values.
@@ -111,7 +124,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
 
         // Fetch user with company info
         const result = await pool.query(
-            `SELECT u.user_id, u.password_hash, u.company_id, u.role,
+            `SELECT u.user_id, u.password_hash, u.company_id, u.role, u.status,
                     c.company_name
              FROM public.users u
              JOIN public.companies c ON c.company_id = u.company_id
@@ -129,6 +142,10 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
         if (!passwordMatch) {
             return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+        }
+
+        if (user.status !== 'active') {
+            return res.status(401).json({ success: false, message: accountStatusMessage(user.status) });
         }
 
         const accessToken = signAccessToken(user.user_id, normalizedEmail);
@@ -163,6 +180,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req: Request, r
                 id: user.user_id,
                 email: normalizedEmail,
                 role: user.role,
+                status: user.status,
                 companyId: user.company_id,
                 companyName: user.company_name,
                 employeeId,
@@ -195,7 +213,7 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
 
         // Fetch user with company info
         const result = await pool.query(
-            `SELECT u.user_id, u.company_id, u.role, c.company_name
+            `SELECT u.user_id, u.company_id, u.role, u.status, c.company_name
              FROM public.users u
              JOIN public.companies c ON c.company_id = u.company_id
              WHERE u.email = $1
@@ -208,6 +226,10 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
         }
 
         const user = result.rows[0];
+
+        if (user.status !== 'active') {
+            return res.status(401).json({ success: false, message: accountStatusMessage(user.status) });
+        }
 
         const accessToken = signAccessToken(user.user_id, normalizedEmail);
         const { rawToken: refreshToken } = await createRefreshSession(user.user_id, req);
@@ -240,6 +262,7 @@ router.post('/google', authLimiter, validate(googleAuthSchema), async (req: Requ
                 id: user.user_id,
                 email: normalizedEmail,
                 role: user.role,
+                status: user.status,
                 companyId: user.company_id,
                 companyName: user.company_name,
                 employeeId,
@@ -273,7 +296,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
         // Look up the session by token hash
         const sessionResult = await client.query(
             `SELECT s.session_id, s.user_id, s.revoked, s.expires_at, s.replaced_by,
-                    u.email, u.role, u.company_id
+                    u.email, u.role, u.company_id, u.status
              FROM public.refresh_token_sessions s
              JOIN public.users u ON u.user_id = s.user_id
              WHERE s.token_hash = $1
@@ -286,6 +309,10 @@ router.post('/refresh', async (req: Request, res: Response) => {
         }
 
         const session = sessionResult.rows[0];
+
+        if (session.status !== 'active') {
+            return res.status(401).json({ success: false, message: accountStatusMessage(session.status) });
+        }
 
         // ── REPLAY ATTACK DETECTION ─────────────────────────────
         // If this token was already revoked, someone is reusing a stolen token.
@@ -432,6 +459,7 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
                 id: user.userId,
                 email: user.email,
                 role: user.role,
+                status: user.status,
                 companyId: user.companyId,
                 companyName: result.rows[0]?.company_name || 'Company',
                 employeeId,
