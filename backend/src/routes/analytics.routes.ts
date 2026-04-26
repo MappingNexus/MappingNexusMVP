@@ -156,7 +156,9 @@ router.get('/overview', requireAuth, requireRole('hr', 'manager'), async (req: R
                             if (decrypted) name = decrypted;
                         }
                     } catch (decErr: any) {
-                        console.error('Decrypt name failed for employee', e.employee_id, decErr.message);
+                        if (decErr.message !== 'Company secret required to decrypt protected data.') {
+                            console.error('Decrypt name failed for employee', e.employee_id, decErr.message);
+                        }
                     }
 
                     const util = Math.min(100, e.capacity_committed_pct || e.current_project_load * 25);
@@ -241,7 +243,9 @@ router.get('/burnout', requireAuth, requireRole('hr', 'manager'), async (req: Re
                         if (d) return d;
                     }
                 } catch (decErr: any) {
-                    console.error('Decrypt name failed for employee', e.employee_id, decErr.message);
+                    if (decErr.message !== 'Company secret required to decrypt protected data.') {
+                        console.error('Decrypt name failed for employee', e.employee_id, decErr.message);
+                    }
                 }
                 return `Employee ${hashForDisplay(e.employee_id)}`;
             }));
