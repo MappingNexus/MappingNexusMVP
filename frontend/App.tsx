@@ -90,9 +90,8 @@ function App() {
     const checkSession = async () => {
         const stored = api.getUser();
         const token = api.getToken();
-        const companySecret = api.getCompanySecret();
 
-        if (!stored || !token || !companySecret) {
+        if (!stored || !token) {
             if (stored || token) api.clearSession();
             setLoading(false);
             return;

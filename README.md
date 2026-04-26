@@ -60,6 +60,23 @@ Frontend runs on: `http://localhost:5173`
 
 ---
 
+## 🌍 Deployment Instructions
+
+**Frontend (Vercel):**
+1. Connect your GitHub repository to Vercel.
+2. Set the framework preset to **Vite**.
+3. Add the `VITE_API_URL` (pointing to your live backend) and `VITE_GOOGLE_CLIENT_ID` in the Vercel Environment Variables settings.
+4. Deploy.
+
+**Backend (Render / Railway):**
+1. Create a new Web Service and connect the repository.
+2. Set the build command to `npm install && npm run build` (inside the `backend` directory).
+3. Set the start command to `npm run start`.
+4. Add all required `.env` variables (`DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `OPENROUTER_API_KEY`, `ENCRYPTION_KEK`).
+5. Ensure your Neon database allows connections from the deployed backend IP (or is open).
+
+---
+
 ## 🔐 Login Credentials & Google OAuth
 
 The application uses Role-Based Access Control (RBAC). Your dashboard view depends entirely on your database `role`.
@@ -113,10 +130,15 @@ The core value proposition of Mapping Nexus is its high-accuracy AI employee-to-
 
 ## 💾 Demo Data Generation
 
-If you are setting up a fresh database instance, you will need to populate it with synthetic profiles and embeddings to test the AI engine.
+If you are setting up a fresh database instance (or if you just migrated to the passwordless Google OAuth flow), you will need to populate it with synthetic profiles and embeddings to test the AI engine.
 
 **1. Generate Dummy Candidates:**
-*(If a seeder exists, run your standard seeder command here)*
+Because we bypassed the "Tenant Secret" requirement for 1-click Google OAuth, any employees created *before* this change will show up as `Employee <hash>`. To generate fresh employees with visible names:
+```bash
+cd backend
+npm run generate-data
+```
+*Note: This will output test credentials for HR and Manager roles at the end of the script.*
 
 **2. Backfill AI Embeddings:**
 Once you have raw employee data, you must generate their vector embeddings so the AI can search them mathematically:
@@ -133,6 +155,12 @@ npx tsx src/scripts/backfill-embeddings.ts
 **Backend won't start / DB Error:**
 - Ensure `DATABASE_URL` is pointing to the correct Neon DB string.
 - If getting JWT or Encryption errors, ensure your `.env` contains `JWT_SECRET` and `ENCRYPTION_KEK`.
+
+**Employee Names showing as "Employee <hash>":**
+- This happens if the data was encrypted with a Tenant Secret that is no longer provided during login. Re-run `npm run generate-data` to create fresh records.
+
+**Render Deployment Failing (TS2688):**
+- Ensure your `backend/tsconfig.json` excludes test files (`**/*.test.ts`) and removes `"jest"` from the types array so the production build passes without dev dependencies.
 
 **Google Login Failed:**
 - Ensure `VITE_GOOGLE_CLIENT_ID` (frontend) and `GOOGLE_CLIENT_ID` (backend) exactly match your Google Cloud Console Client ID.
