@@ -23,6 +23,7 @@ import { apiLimiter } from './middleware/rateLimiter.js';
 
 // Route imports
 import authRoutes from './routes/auth.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import employeeRoutes from './routes/employees.routes.js';
 import teamRoutes from './routes/teams.routes.js';
 import matchingRoutes from './routes/matching.routes.js';
@@ -35,6 +36,7 @@ import bulkImportRoutes from './routes/bulk-import.routes.js';
 import requestRoutes from './routes/requests.routes.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
@@ -78,6 +80,7 @@ app.use('/api', apiLimiter);
 // ============================================================
 
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/employees/bulk-import', bulkImportRoutes); // MUST be before /api/employees
 app.use('/api/employees', employeeRoutes);
 app.use('/api/teams', teamRoutes);

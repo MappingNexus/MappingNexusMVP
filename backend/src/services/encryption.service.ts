@@ -219,7 +219,9 @@ export async function decryptFields(
             try {
                 return [key, await decrypt(value, companyId, companySecret)] as const;
             } catch (err: any) {
-                console.error(`[encryption] Failed to decrypt field "${key}" for company "${companyId}":`, err.message);
+                if (err.message !== 'Company secret required to decrypt protected data.') {
+                    console.error(`[encryption] Failed to decrypt field "${key}" for company "${companyId}":`, err.message);
+                }
                 return [key, null] as const;
             }
         })

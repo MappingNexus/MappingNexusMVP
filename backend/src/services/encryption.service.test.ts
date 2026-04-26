@@ -1,5 +1,3 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
 import {
     decrypt,
     decryptFields,
@@ -11,58 +9,72 @@ import {
 const COMPANY_ID = 'company-test';
 const COMPANY_SECRET = 'correct horse battery staple';
 
-test('encrypt and decrypt round-trip session-protected ciphertext', async () => {
-    const ciphertext = await encrypt('alice@example.com', COMPANY_ID, COMPANY_SECRET);
+describe('encryption service', () => {
+    it('encrypts and decrypts session-protected ciphertext', async () => {
+        // setup
+        const plaintext = 'alice@example.com';
 
-    assert.match(ciphertext, /^v2:/);
-    assert.equal(
-        await decrypt(ciphertext, COMPANY_ID, COMPANY_SECRET),
-        'alice@example.com'
-    );
-});
+        // action
+        const ciphertext = await encrypt(plaintext, COMPANY_ID, COMPANY_SECRET);
 
-test('decrypt rejects session-protected ciphertext without the company secret', async () => {
-    const ciphertext = await encrypt('sensitive-value', COMPANY_ID, COMPANY_SECRET);
+        // assertion
+        expect(ciphertext).toMatch(/^v2:/);
+        await expect(decrypt(ciphertext, COMPANY_ID, COMPANY_SECRET)).resolves.toBe(plaintext);
+    });
 
-    await assert.rejects(
-        () => decrypt(ciphertext, COMPANY_ID),
-        /Company secret required to decrypt protected data/
-    );
-});
+    it('rejects session-protected ciphertext without the company secret', async () => {
+        // setup
+        const ciphertext = await encrypt('sensitive-value', COMPANY_ID, COMPANY_SECRET);
 
-test('encrypt and decrypt still support legacy company-derived ciphertext', async () => {
-    const ciphertext = await encrypt('legacy-value', COMPANY_ID);
+        // action/assertion
+        await expect(decrypt(ciphertext, COMPANY_ID)).rejects.toThrow(
+            /Company secret required to decrypt protected data/
+        );
+    });
 
-    assert.doesNotMatch(ciphertext, /^v2:/);
-    assert.equal(await decrypt(ciphertext, COMPANY_ID), 'legacy-value');
-});
+    it('still supports legacy company-derived ciphertext', async () => {
+        // setup
+        const plaintext = 'legacy-value';
 
-test('encryptFields and decryptFields preserve nulls and recover plaintext values', async () => {
-    const encrypted = await encryptFields(
-        {
+        // action
+        const ciphertext = await encrypt(plaintext, COMPANY_ID);
+
+        // assertion
+        expect(ciphertext).not.toMatch(/^v2:/);
+        await expect(decrypt(ciphertext, COMPANY_ID)).resolves.toBe(plaintext);
+    });
+
+    it('preserves nulls and recovers plaintext field values', async () => {
+        // setup
+        const fields = {
             name: 'Alice',
             costPerDay: 1234,
             note: null,
-        },
-        COMPANY_ID,
-        COMPANY_SECRET
-    );
+        };
 
-    assert.equal(encrypted.note, null);
+        // action
+        const encrypted = await encryptFields(fields, COMPANY_ID, COMPANY_SECRET);
+        const decrypted = await decryptFields(encrypted, COMPANY_ID, COMPANY_SECRET);
 
-    const decrypted = await decryptFields(encrypted, COMPANY_ID, COMPANY_SECRET);
-
-    assert.deepEqual(decrypted, {
-        name: 'Alice',
-        costPerDay: '1234',
-        note: null,
+        // assertion
+        expect(encrypted.note).toBeNull();
+        expect(decrypted).toEqual({
+            name: 'Alice',
+            costPerDay: '1234',
+            note: null,
+        });
     });
-});
 
-test('hashForDisplay is deterministic and short enough for UI display', () => {
-    const first = hashForDisplay('employee-123');
-    const second = hashForDisplay('employee-123');
+    it('hashForDisplay is deterministic and short enough for UI display', () => {
+        // setup
+        const id = 'employee-123';
 
-    assert.equal(first, second);
-    assert.equal(first.length, 12);
+        // action
+        const first = hashForDisplay(id);
+        const second = hashForDisplay(id);
+
+        // assertion
+        expect(first).toBe(second);
+        expect(first).toHaveLength(12);
+    });
 });

@@ -20,6 +20,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
 const AUTH_REFRESH_EXEMPT_PATHS = new Set([
     '/api/auth/login',
     '/api/auth/forgot-password',
+    '/api/auth/reset-password',
     '/api/auth/refresh',
     '/api/auth/onboard-company',
     '/api/auth/invite-status',
@@ -140,6 +141,67 @@ async function parseResponse<T>(response: Response): Promise<T> {
     }
 }
 
+// ============ Refresh Queue / Lock Pattern ============
+// When multiple requests get 401 at the same time, only ONE refresh
+// request is made. All other callers wait on the same promise.
+
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Attempt to refresh tokens. Uses a lock so concurrent calls
+ * coalesce into a single network request.
+ */
+async function refreshTokenWithLock(): Promise<boolean> {
+    if (isRefreshing && refreshPromise) {
+        // Another call is already refreshing — piggyback on it
+        return refreshPromise;
+    }
+
+    isRefreshing = true;
+    refreshPromise = _doRefresh();
+
+    try {
+        return await refreshPromise;
+    } finally {
+        isRefreshing = false;
+        refreshPromise = null;
+    }
+}
+
+/**
+ * Internal: calls /api/auth/refresh directly via fetch (NOT through
+ * the request() wrapper) to avoid triggering the 401 interceptor loop.
+ */
+async function _doRefresh(): Promise<boolean> {
+    const rt = localStorage.getItem(REFRESH_KEY);
+    if (!rt) return false;
+
+    try {
+        const response = await fetch(`${API}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: rt }),
+        });
+
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        if (data.success && data.session) {
+            localStorage.setItem(TOKEN_KEY, data.session.access_token);
+            // Rotation: server sends a NEW refresh token each time
+            if (data.session.refresh_token) {
+                localStorage.setItem(REFRESH_KEY, data.session.refresh_token);
+            }
+            return true;
+        }
+    } catch {
+        // Network error during refresh — treat as failure
+    }
+
+    return false;
+}
+
 async function request<T = any>(path: string, options?: RequestInit): Promise<T> {
     const url = `${API}${path}`;
 
@@ -148,8 +210,9 @@ async function request<T = any>(path: string, options?: RequestInit): Promise<T>
 
         // Auto-refresh on 401 for authenticated routes only.
         if (response.status === 401 && !AUTH_REFRESH_EXEMPT_PATHS.has(path)) {
-            const refreshed = await refreshToken();
+            const refreshed = await refreshTokenWithLock();
             if (refreshed) {
+                // Retry the original request with the fresh access token
                 response = await fetchWithTimeout(url, options);
             } else {
                 clearSession();
@@ -208,10 +271,18 @@ export async function forgotPassword(email: string) {
     });
 }
 
+export async function resetPassword(token: string, newPassword: string) {
+    return request('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword }),
+    });
+}
+
 export async function onboardCompany(data: {
     companyName: string;
     adminName: string;
     adminEmail: string;
+    adminPassword: string;
 }) {
     return request('/api/auth/onboard-company', {
         method: 'POST',
@@ -219,21 +290,9 @@ export async function onboardCompany(data: {
     });
 }
 
+/** Public wrapper — delegates to the lock-based implementation. */
 export async function refreshToken(): Promise<boolean> {
-    const rt = localStorage.getItem(REFRESH_KEY);
-    if (!rt) return false;
-    try {
-        const data = await request('/api/auth/refresh', {
-            method: 'POST',
-            body: JSON.stringify({ refresh_token: rt }),
-        });
-        if (data.success && data.session) {
-            localStorage.setItem(TOKEN_KEY, data.session.access_token);
-            localStorage.setItem(REFRESH_KEY, data.session.refresh_token);
-            return true;
-        }
-    } catch {}
-    return false;
+    return refreshTokenWithLock();
 }
 
 export async function getMe() {
@@ -244,9 +303,24 @@ export async function getInviteStatus() {
     return request<{ success: boolean; configured: boolean; message: string }>('/api/auth/invite-status');
 }
 
-export function logout() {
-    clearSession();
-    window.location.href = '/login';
+export async function logout(): Promise<void> {
+    // Best-effort: tell backend to revoke the refresh session before local cleanup.
+    const rt = localStorage.getItem(REFRESH_KEY);
+
+    try {
+        if (rt) {
+            await fetch(`${API}/api/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: rt }),
+            });
+        }
+    } catch {
+        // Logout must still complete locally even if the revoke call fails.
+    } finally {
+        clearSession();
+        window.location.href = '/login';
+    }
 }
 
 // ============ Employees ============

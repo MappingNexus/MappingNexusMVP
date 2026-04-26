@@ -128,11 +128,11 @@ export async function sendPasswordResetEmail(
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <h2 style="color: #1a1a2e;">Password Reset</h2>
-                    <p>Click the link below to reset your Mapping Nexus password. This link expires in 15 minutes.</p>
+                    <p>Click the link below to reset your Mapping Nexus password. This link expires in 1 hour and can only be used once.</p>
                     <a href="${resetUrl}" style="display: inline-block; background: #6C5CE7; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none;">
                         Reset Password
                     </a>
-                    <p style="color: #666; font-size: 12px; margin-top: 30px;">If you did not request this, ignore this email.</p>
+                    <p style="color: #666; font-size: 12px; margin-top: 30px;">If you did not request this, ignore this email. Your password will remain unchanged.</p>
                 </div>
             `,
         });
