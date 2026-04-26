@@ -293,21 +293,28 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
     }
 });
 
+// ── Onboard schema ──────────────────────────────────────────
+const onboardSchema = z.object({
+    companyName: z.string().trim().min(1, 'Company name is required.').max(200),
+    adminName: z.string().trim().min(1, 'Admin name is required.').max(200),
+    adminEmail: z.string().trim().email('Invalid email format.'),
+    adminPassword: z
+        .string()
+        .min(8, 'Password must be at least 8 characters.')
+        .max(256, 'Password must be at most 256 characters.')
+        .regex(/[A-Z]/, 'Password must contain at least one uppercase letter.')
+        .regex(/[a-z]/, 'Password must contain at least one lowercase letter.')
+        .regex(/[0-9]/, 'Password must contain at least one number.'),
+});
+
 /**
  * POST /api/auth/onboard-company
  * Creates a new company + HR admin user.
  */
-router.post('/onboard-company', authLimiter, async (req: Request, res: Response) => {
+router.post('/onboard-company', authLimiter, validate(onboardSchema), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
         const { companyName, adminName, adminEmail, adminPassword } = req.body;
-
-        if (!companyName || !adminEmail || !adminPassword) {
-            return res.status(400).json({
-                success: false,
-                message: 'companyName, adminEmail, and adminPassword are required.',
-            });
-        }
 
         const normalizedEmail = adminEmail.toLowerCase().trim();
 
@@ -346,12 +353,12 @@ router.post('/onboard-company', authLimiter, async (req: Request, res: Response)
             actorRole: 'hr',
             action: AuditActions.USER_CREATED,
             companyId: company.company_id,
-            metadata: { role: 'hr' },
+            metadata: { role: 'hr', adminName: adminName.trim() },
         }).catch(() => {});
 
         return res.status(201).json({
             success: true,
-            message: 'Company and HR admin account created successfully.',
+            message: `Workspace "${company.company_name}" created. Sign in with ${normalizedEmail} to get started.`,
             company: {
                 companyId: company.company_id,
                 companyName: company.company_name,

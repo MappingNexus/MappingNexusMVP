@@ -212,6 +212,7 @@ export async function onboardCompany(data: {
     companyName: string;
     adminName: string;
     adminEmail: string;
+    adminPassword: string;
 }) {
     return request('/api/auth/onboard-company', {
         method: 'POST',
