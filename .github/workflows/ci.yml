@@ -1,0 +1,77 @@
+name: Robust CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel in-progress runs on same branch if a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-ci:
+    name: Backend CI (Node.js & Jest)
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Typecheck & Build
+        run: npm run build
+
+      - name: Run Jest Test Suite
+        env:
+          NODE_ENV: test
+          # You can define fake env variables for the tests here if needed
+          JWT_SECRET: "ci-test-secret"
+          ENCRYPTION_KEK: "deadbeefcafebabedeadbeefcafebabedeadbeefcafebabedeadbeefcafebabe"
+        run: npm test
+
+  frontend-ci:
+    name: Frontend CI (React & Vite)
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Typecheck & Build
+        run: npm run build
+
+      - name: Run Unit Tests
+        run: npm run test --if-present
