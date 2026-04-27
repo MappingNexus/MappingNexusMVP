@@ -21,6 +21,7 @@ import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/au
 import { encrypt, decrypt, decryptFields, encryptFields, hashForDisplay } from '../services/encryption.service.js';
 import { logAction, AuditActions } from '../services/audit.service.js';
 import { generateSkillEmbedding } from '../services/embedding.service.js';
+import { enqueueEmbeddingJob } from '../workers/queue.js';
 import {
     sendPasswordSetupEmail,
     getInviteEmailFailureMessage,
@@ -428,27 +429,20 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
                 });
             }
 
-            // Generate all embeddings in parallel
-            const skillRows = await Promise.all(
-                skillValidation.normalizedSkills.map(async s => {
-                    let embedding: number[] | null = null;
-                    try {
-                        embedding = await generateSkillEmbedding(s.skill_name, s.proficiency);
-                    } catch (embErr: any) {
-                        console.warn('Embedding generation failed for', s.skill_name, embErr.message);
-                    }
-                    return {
-                        employee_id: employee.employee_id,
-                        company_id: user.companyId,
-                        skill_name: s.skill_name,
-                        proficiency: s.proficiency,
-                        last_used_date: s.last_used_date,
-                        embedding: embedding ? JSON.stringify(embedding) : null,
-                    };
-                })
-            );
+            const skillRows = skillValidation.normalizedSkills.map(s => ({
+                employee_id: employee.employee_id,
+                company_id: user.companyId,
+                skill_name: s.skill_name,
+                proficiency: s.proficiency,
+                last_used_date: s.last_used_date,
+                embedding: null,
+            }));
 
             await db.from('skills').insert(skillRows);
+
+            // Enqueue background job to generate embeddings
+            const skillsText = skillValidation.normalizedSkills.map(s => `${s.skill_name} (${s.proficiency})`).join(', ');
+            await enqueueEmbeddingJob(employee.employee_id, skillsText);
         }
 
         await syncAvailabilityWindows(db, employee.employee_id, user.companyId, user.userId, availabilityWindows);
@@ -816,26 +810,19 @@ router.put('/:id', requireAuth, requireRole('hr', 'employee'), validate(updateEm
                 .eq('company_id', user.companyId);
 
             if (skillValidation.normalizedSkills.length > 0) {
-                // Generate all embeddings in parallel
-                const skillRows = await Promise.all(
-                    skillValidation.normalizedSkills.map(async s => {
-                        let embedding: number[] | null = null;
-                        try {
-                            embedding = await generateSkillEmbedding(s.skill_name, s.proficiency);
-                        } catch (embErr: any) {
-                            console.warn('Embedding generation failed for', s.skill_name, embErr.message);
-                        }
-                        return {
-                            employee_id: id,
-                            company_id: user.companyId,
-                            skill_name: s.skill_name,
-                            proficiency: s.proficiency,
-                            last_used_date: s.last_used_date,
-                            embedding: embedding ? JSON.stringify(embedding) : null,
-                        };
-                    })
-                );
+                const skillRows = skillValidation.normalizedSkills.map(s => ({
+                    employee_id: id,
+                    company_id: user.companyId,
+                    skill_name: s.skill_name,
+                    proficiency: s.proficiency,
+                    last_used_date: s.last_used_date,
+                    embedding: null,
+                }));
                 await db.from('skills').insert(skillRows);
+
+                // Enqueue background job to generate embeddings
+                const skillsText = skillValidation.normalizedSkills.map(s => `${s.skill_name} (${s.proficiency})`).join(', ');
+                await enqueueEmbeddingJob(id, skillsText);
             }
         }
 
