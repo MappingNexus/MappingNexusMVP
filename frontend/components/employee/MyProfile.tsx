@@ -2,9 +2,9 @@
  * Employee Self-Service Profile
  */
 import React, { useEffect, useState } from 'react';
-import { User, MapPin, Briefcase, Zap, Save, Loader2 } from 'lucide-react';
+import { MapPin, Briefcase, Zap, Save, Loader2, CalendarDays, RefreshCw, Link2, Unlink } from 'lucide-react';
 import * as api from '../../services/api';
-import type { Employee } from '../../types';
+import type { AvailabilityWindow, Employee } from '../../types';
 import LoadingSpinner from '../shared/LoadingSpinner';
 
 const MyProfile: React.FC = () => {
@@ -12,16 +12,31 @@ const MyProfile: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [editMode, setEditMode] = useState(false);
+    const [calendarStatus, setCalendarStatus] = useState<Awaited<ReturnType<typeof api.getCalendarStatus>>['status'] | null>(null);
+    const [calendarBusy, setCalendarBusy] = useState<string | null>(null);
+    const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
     const [form, setForm] = useState({
         location: '',
         travelEligible: false,
         availabilityFrom: '',
         availabilityTo: '',
         skills: '',
-        availabilityWindows: [] as Array<{ windowType: 'holiday' | 'project_commitment' | 'personal' | 'other'; startDate: string; endDate: string; note?: string }>,
+        availabilityWindows: [] as AvailabilityWindow[],
     });
 
-    useEffect(() => { fetchProfile(); }, []);
+    useEffect(() => {
+        void fetchProfile();
+        void fetchCalendarStatus();
+
+        const calendarResult = new URLSearchParams(window.location.search).get('calendar');
+        if (calendarResult) {
+            const readable = calendarResult.includes('connected')
+                ? 'Calendar connected. Run Sync now or wait for the nightly refresh.'
+                : 'Calendar connection did not complete. Please try again.';
+            setCalendarMessage(readable);
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
 
     const fetchProfile = async () => {
         const res = await api.getEmployees();
@@ -34,10 +49,55 @@ const MyProfile: React.FC = () => {
                 availabilityFrom: emp.availabilityFrom || '',
                 availabilityTo: emp.availabilityTo || '',
                 skills: emp.skills.map(s => s.skill_name).join(', '),
-                availabilityWindows: emp.availabilityWindows || [],
+                availabilityWindows: (emp.availabilityWindows || []).filter(window => window.source !== 'calendar'),
             });
         }
         setLoading(false);
+    };
+
+    const fetchCalendarStatus = async () => {
+        const res = await api.getCalendarStatus();
+        if (res.success) setCalendarStatus(res.status);
+    };
+
+    const connectCalendar = async (provider: api.CalendarProvider) => {
+        setCalendarBusy(provider);
+        setCalendarMessage(null);
+        const res = await api.getCalendarAuthUrl(provider);
+        if (res.success && res.authorizationUrl) {
+            window.location.href = res.authorizationUrl;
+            return;
+        }
+        setCalendarMessage(res.message || `Unable to connect ${provider}.`);
+        setCalendarBusy(null);
+    };
+
+    const syncCalendar = async (provider: api.CalendarProvider) => {
+        setCalendarBusy(provider);
+        setCalendarMessage(null);
+        const res = await api.syncCalendar(provider);
+        if (res.success) {
+            setCalendarMessage(`Synced ${res.syncedWindows} calendar availability window${res.syncedWindows === 1 ? '' : 's'}.`);
+            await fetchCalendarStatus();
+            await fetchProfile();
+        } else {
+            setCalendarMessage(res.message || 'Calendar sync failed.');
+        }
+        setCalendarBusy(null);
+    };
+
+    const disconnectCalendar = async (provider: api.CalendarProvider) => {
+        setCalendarBusy(provider);
+        setCalendarMessage(null);
+        const res = await api.disconnectCalendar(provider);
+        if (res.success) {
+            setCalendarMessage(`${provider === 'google' ? 'Google Calendar' : 'Outlook Calendar'} disconnected.`);
+            await fetchCalendarStatus();
+            await fetchProfile();
+        } else {
+            setCalendarMessage(res.message || 'Unable to disconnect calendar.');
+        }
+        setCalendarBusy(null);
     };
 
     const handleSave = async () => {
@@ -146,12 +206,22 @@ const MyProfile: React.FC = () => {
                                         </div>
                                     ))}
                                     <button type="button" onClick={() => setForm(prev => ({ ...prev, availabilityWindows: [...prev.availabilityWindows, { windowType: 'holiday', startDate: '', endDate: '' }] }))} className="text-xs text-blue-500 dark:text-[#00FF66] hover:text-gray-900 dark:text-white font-mono transition-colors">+ Add blocked window</button>
+                                    {(profile.availabilityWindows || []).some(window => window.source === 'calendar') && (
+                                        <p className="text-[10px] font-mono text-gray-500 dark:text-[#8a8a8a]">
+                                            Calendar-synced windows are managed from Calendar Sync and are not edited here.
+                                        </p>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="space-y-2">
                                     {(profile.availabilityWindows || []).map(window => (
                                         <div key={`${window.windowType}-${window.startDate}-${window.endDate}`} className="border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-black/50 backdrop-blur-md px-3 py-2 text-xs text-gray-500 dark:text-[#8a8a8a] font-mono">
                                             <span className="capitalize">{window.windowType.replace('_', ' ')}</span> • {new Date(window.startDate).toLocaleDateString()} - {new Date(window.endDate).toLocaleDateString()}
+                                            {window.source === 'calendar' && (
+                                                <span className="ml-2 text-blue-500 dark:text-[#00FF66] uppercase">
+                                                    {window.sourceProvider || 'calendar'}
+                                                </span>
+                                            )}
                                         </div>
                                     ))}
                                     {(!profile.availabilityWindows || profile.availabilityWindows.length === 0) && <span className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs">No blocked windows configured.</span>}
@@ -170,6 +240,69 @@ const MyProfile: React.FC = () => {
             </div>
 
             {/* Skills */}
+            <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4 flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-blue-500 dark:text-[#00FF66]" /> Calendar Sync
+                </h3>
+                <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs mb-4">
+                    Connect Google Calendar or Outlook to automatically add OOO and multi-day busy events as holiday windows.
+                </p>
+                {calendarMessage && (
+                    <div className="border border-blue-500/30 bg-blue-500/10 text-blue-500 dark:text-[#00FF66] px-3 py-2 text-xs font-mono mb-4">
+                        {calendarMessage}
+                    </div>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                    {(['google', 'outlook'] as api.CalendarProvider[]).map(provider => {
+                        const label = provider === 'google' ? 'Google Calendar' : 'Outlook Calendar';
+                        const status = calendarStatus?.[provider];
+                        const busy = calendarBusy === provider;
+                        return (
+                            <div key={provider} className="border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-black/50 backdrop-blur-md p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-black text-gray-900 dark:text-white uppercase">{label}</p>
+                                        <p className="text-[10px] font-mono uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a]">
+                                            {status?.connected ? 'Connected' : 'Not connected'}
+                                        </p>
+                                    </div>
+                                    <span className={`h-2 w-2 rounded-full ${status?.connected ? 'bg-blue-500 dark:bg-[#00FF66]' : 'bg-gray-400'}`} />
+                                </div>
+                                {status?.lastSyncedAt && (
+                                    <p className="text-[10px] font-mono text-gray-500 dark:text-[#8a8a8a] mt-3">
+                                        Last sync: {new Date(status.lastSyncedAt).toLocaleString()}
+                                    </p>
+                                )}
+                                {status?.lastSyncError && (
+                                    <p className="text-[10px] font-mono text-[#FF3333] mt-3">
+                                        Last error: {status.lastSyncError}
+                                    </p>
+                                )}
+                                <div className="flex flex-wrap gap-2 mt-4">
+                                    {!status?.connected ? (
+                                        <button type="button" disabled={busy} onClick={() => connectCalendar(provider)}
+                                            className="bg-white text-black font-bold uppercase tracking-widest text-[10px] px-3 py-2 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2">
+                                            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />} Connect
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <button type="button" disabled={busy} onClick={() => syncCalendar(provider)}
+                                                className="bg-white text-black font-bold uppercase tracking-widest text-[10px] px-3 py-2 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2">
+                                                {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Sync now
+                                            </button>
+                                            <button type="button" disabled={busy} onClick={() => disconnectCalendar(provider)}
+                                                className="border border-[#333333] text-gray-500 dark:text-[#8a8a8a] hover:text-[#FF3333] uppercase tracking-widest text-[10px] px-3 py-2 transition-colors disabled:opacity-50 flex items-center gap-2">
+                                                <Unlink className="w-3 h-3" /> Disconnect
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
             <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-blue-500 dark:text-[#00FF66]" /> Skills

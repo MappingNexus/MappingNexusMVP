@@ -99,7 +99,8 @@ async function syncAvailabilityWindows(
         .from('availability_window')
         .delete()
         .eq('employee_id', employeeId)
-        .eq('company_id', companyId);
+        .eq('company_id', companyId)
+        .eq('source', 'manual');
 
     if (windows.length === 0) return;
 
@@ -112,6 +113,7 @@ async function syncAvailabilityWindows(
             start_date: window.startDate,
             end_date: window.endDate,
             note: window.note || null,
+            source: 'manual',
             created_by: actorId,
         })));
 }
@@ -224,7 +226,7 @@ async function formatEmployeeResponse(
 
     const { data: windows } = await db
         .from('availability_window')
-        .select('availability_window_id, window_type, start_date, end_date, note')
+        .select('availability_window_id, window_type, start_date, end_date, note, source, source_provider')
         .eq('employee_id', emp.employee_id)
         .eq('company_id', companyId)
         .order('start_date', { ascending: true });
@@ -254,6 +256,8 @@ async function formatEmployeeResponse(
             startDate: window.start_date,
             endDate: window.end_date,
             note: window.note,
+            source: window.source || 'manual',
+            sourceProvider: window.source_provider || null,
         })),
         createdAt: emp.created_at,
         updatedAt: emp.updated_at,

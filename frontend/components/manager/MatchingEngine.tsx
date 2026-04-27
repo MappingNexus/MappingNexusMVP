@@ -16,6 +16,8 @@ const MatchingEngine: React.FC = () => {
     const [seniority, setSeniority] = useState('');
     const [budget, setBudget] = useState('');
     const [travelReq, setTravelReq] = useState(false);
+    const [projectStart, setProjectStart] = useState('');
+    const [projectEnd, setProjectEnd] = useState('');
     const [results, setResults] = useState<MatchResult[] | null>(null);
     const [scanning, setScanning] = useState(false);
     const [matchError, setMatchError] = useState<string | null>(null);
@@ -64,6 +66,8 @@ const MatchingEngine: React.FC = () => {
             seniorityLevel: seniority || undefined,
             budgetCeiling: budget ? parseInt(budget) : undefined,
             travelRequired: travelReq,
+            startDate: projectStart || undefined,
+            endDate: projectEnd || undefined,
         }, brief);
         if (res.success) {
             setResults(res.matches);
@@ -167,7 +171,7 @@ const MatchingEngine: React.FC = () => {
                 </div>
 
                 {/* Filters Row */}
-                <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-5">
                     <div>
                         <label className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-1 block">Seniority</label>
                         <select value={seniority} onChange={e => setSeniority(e.target.value)}
@@ -178,6 +182,16 @@ const MatchingEngine: React.FC = () => {
                     <div>
                         <label className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-1 block">Budget Ceiling (₹/day)</label>
                         <input type="number" value={budget} onChange={e => setBudget(e.target.value)} placeholder="Optional"
+                            className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-3 py-2.5 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] font-mono text-sm transition-colors" />
+                    </div>
+                    <div>
+                        <label className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-1 block">Project Start</label>
+                        <input type="date" value={projectStart} onChange={e => setProjectStart(e.target.value)}
+                            className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-3 py-2.5 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] font-mono text-sm transition-colors" />
+                    </div>
+                    <div>
+                        <label className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-1 block">Project End</label>
+                        <input type="date" value={projectEnd} onChange={e => setProjectEnd(e.target.value)}
                             className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-3 py-2.5 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] font-mono text-sm transition-colors" />
                     </div>
                     <div className="flex items-end pb-1">
