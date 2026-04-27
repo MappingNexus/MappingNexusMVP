@@ -160,7 +160,7 @@ npx tsx src/scripts/backfill-embeddings.ts
 - This happens if the data was encrypted with a Tenant Secret that is no longer provided during login. Re-run `npm run generate-data` to create fresh records.
 
 **Render Deployment Failing (TS2688):**
-- Ensure your `backend/tsconfig.json` excludes test files (`**/*.test.ts`) and removes `"jest"` from the types array so the production build passes without dev dependencies.
+- Ensure your backend uses `npm run build` which should be configured to run `tsc -p tsconfig.build.json`. This dedicated build config excludes test files and `jest` types from the production build.
 
 **Google Login Failed:**
 - Ensure `VITE_GOOGLE_CLIENT_ID` (frontend) and `GOOGLE_CLIENT_ID` (backend) exactly match your Google Cloud Console Client ID.
