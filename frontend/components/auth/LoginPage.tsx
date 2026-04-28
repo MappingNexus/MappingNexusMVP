@@ -5,14 +5,13 @@ import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import PublicLayout from '../shared/PublicLayout';
 
 interface Props {
-    onLogin: (email: string, password: string, companySecret: string) => Promise<{ success: boolean; message?: string }>;
-    onGoogleLogin: (idToken: string, companySecret: string) => Promise<{ success: boolean; message?: string }>;
+    onLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+    onGoogleLogin: (idToken: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [companySecret, setCompanySecret] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -25,7 +24,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
         setLoading(true);
         setError('');
         try {
-            const result = await onLogin(email, password, '');
+            const result = await onLogin(email, password);
             if (!result.success) {
                 setError(result.message || 'Invalid credentials.');
             }
@@ -41,7 +40,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
             setLoading(true);
             setError('');
             try {
-                const result = await onGoogleLogin(credentialResponse.credential, '');
+                const result = await onGoogleLogin(credentialResponse.credential);
                 if (!result.success) {
                     setError(result.message || 'Google Login failed.');
                 }

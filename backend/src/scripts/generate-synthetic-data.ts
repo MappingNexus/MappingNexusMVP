@@ -255,7 +255,7 @@ async function main() {
                 proficiency,
                 last_used_date: randomDate(randomInt(5, 180)),
                 // Note: embeddings are NOT generated here for speed.
-                // Run `npm run backfill-embeddings` after seeding to populate vectors.
+                // Run `npm run reindex-embeddings` after seeding to populate vectors.
             }));
 
             await supabaseAdmin.from('skills').insert(skillRows);

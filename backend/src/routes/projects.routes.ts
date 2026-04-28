@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase.js';
 /**
- * Projects Routes — HR creates upcoming projects with required skills
+ * Projects Routes — HR and managers create upcoming projects with required skills
  */
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
@@ -46,10 +46,12 @@ function validateProjectPayload(projectName: string, startDate?: string, endDate
 
 router.get('/', requireAuth, requireRole('hr', 'manager'), async (req: Request, res: Response) => {
     try {
+        const user = (req as AuthenticatedRequest).user;
         const db = supabaseAdmin;
         const { data, error } = await db
             .from('projects')
             .select('*')
+            .eq('company_id', user.companyId)
             .order('start_date', { ascending: true });
 
         if (error) return res.status(500).json({ success: false, message: error.message });
@@ -59,7 +61,7 @@ router.get('/', requireAuth, requireRole('hr', 'manager'), async (req: Request, 
     }
 });
 
-router.post('/', requireAuth, requireRole('hr'), validate(projectSchema), async (req: Request, res: Response) => {
+router.post('/', requireAuth, requireRole('hr', 'manager'), validate(projectSchema), async (req: Request, res: Response) => {
     try {
         const user = (req as AuthenticatedRequest).user;
         const db = supabaseAdmin;
@@ -96,8 +98,9 @@ router.post('/', requireAuth, requireRole('hr'), validate(projectSchema), async 
     }
 });
 
-router.put('/:id', requireAuth, requireRole('hr'), validate(projectSchema), async (req: Request, res: Response) => {
+router.put('/:id', requireAuth, requireRole('hr', 'manager'), validate(projectSchema), async (req: Request, res: Response) => {
     try {
+        const user = (req as AuthenticatedRequest).user;
         const db = supabaseAdmin;
         const { id } = req.params;
         const {
@@ -123,10 +126,14 @@ router.put('/:id', requireAuth, requireRole('hr'), validate(projectSchema), asyn
                 status: status || 'planned',
             })
             .eq('project_id', id)
+            .eq('company_id', user.companyId)
             .select()
             .single();
 
         if (error || !data) {
+            if (error?.code === 'PGRST116' || !data) {
+                return res.status(404).json({ success: false, message: 'Project not found.' });
+            }
             return res.status(500).json({ success: false, message: error?.message || 'Failed to update project.' });
         }
 

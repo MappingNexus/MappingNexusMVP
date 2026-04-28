@@ -113,16 +113,16 @@ function App() {
         setLoading(false);
     };
 
-    const handleLogin = async (email: string, password: string, companySecret: string) => {
-        const result = await api.login(email, password, companySecret);
+    const handleLogin = async (email: string, password: string) => {
+        const result = await api.login(email, password);
         if (result.success && result.user) {
             setUser(result.user);
         }
         return result;
     };
 
-    const handleGoogleLogin = async (idToken: string, companySecret: string) => {
-        const result = await api.loginWithGoogle(idToken, companySecret);
+    const handleGoogleLogin = async (idToken: string) => {
+        const result = await api.loginWithGoogle(idToken);
         if (result.success && result.user) {
             setUser(result.user);
         }

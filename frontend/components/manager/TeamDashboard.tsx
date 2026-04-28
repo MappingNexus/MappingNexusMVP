@@ -16,6 +16,16 @@ const TeamDashboard: React.FC = () => {
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
     const [teamModalError, setTeamModalError] = useState('');
     const [teamModalSuccess, setTeamModalSuccess] = useState('');
+    const readinessTone = overview?.projectReadiness.status === 'ready'
+        ? 'border-blue-500 dark:border-[#00FF66]/20 text-blue-500 dark:text-[#00FF66]'
+        : overview?.projectReadiness.status === 'watch'
+            ? 'border-[#FF9900]/20 text-[#FF9900]'
+            : 'border-[#FF3333]/20 text-[#FF3333]';
+    const readinessLabel = overview?.projectReadiness.status === 'ready'
+        ? 'READY'
+        : overview?.projectReadiness.status === 'watch'
+            ? 'WATCH'
+            : 'GAP';
 
     useEffect(() => {
         let isActive = true;
@@ -155,6 +165,49 @@ const TeamDashboard: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                            <div className="flex items-start justify-between gap-4 mb-5">
+                                <div>
+                                    <h3 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">Project Readiness</h3>
+                                    <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-[10px] uppercase tracking-widest mt-1">Do we have enough available people for projects starting in the next 30-60 days?</p>
+                                </div>
+                                <span className={`border px-3 py-1 text-[10px] font-mono uppercase tracking-widest ${readinessTone}`}>{readinessLabel}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-5">
+                                <div className="border border-gray-200 dark:border-white/10 p-4">
+                                    <p className="text-2xl font-black text-gray-900 dark:text-white">{overview.projectReadiness.coveragePct}%</p>
+                                    <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mt-1">Skill coverage</p>
+                                </div>
+                                <div className="border border-gray-200 dark:border-white/10 p-4">
+                                    <p className="text-2xl font-black text-gray-900 dark:text-white">{overview.projectReadiness.projectsAtRisk}</p>
+                                    <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mt-1">Projects at risk</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-3 text-[10px] font-mono uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-5">
+                                <span>{overview.projectReadiness.upcomingProjects} upcoming projects</span>
+                                <span>{overview.projectReadiness.availablePeople} available people</span>
+                                <span>{overview.projectReadiness.blockedPeople} blocked or saturated</span>
+                            </div>
+                            <div className="space-y-3">
+                                {overview.projectReadiness.biggestGaps.length > 0 ? overview.projectReadiness.biggestGaps.map(gap => (
+                                    <div key={`${gap.projectName}-${gap.skillName}`} className="border border-gray-200 dark:border-white/10 p-4 bg-white/50 dark:bg-black/50 backdrop-blur-md">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-900 dark:text-white uppercase">{gap.skillName}</p>
+                                                <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono mt-1">{gap.projectName}{gap.startDate ? ` • starts ${gap.startDate}` : ''}</p>
+                                            </div>
+                                            <span className="text-xs text-[#FF3333] font-mono uppercase tracking-widest">Gap {gap.gap}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono mt-2">Need {gap.demand}, available {gap.available}</p>
+                                    </div>
+                                )) : (
+                                    <div className="border border-dashed border-gray-200 dark:border-white/10 p-6 text-center text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">
+                                        ➔ No projected staffing gaps in the next 60 days
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Utilization */}
                         <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
                             <h3 className="font-black text-gray-900 dark:text-white uppercase tracking-tight mb-4">Team Utilization</h3>

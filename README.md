@@ -84,7 +84,7 @@ The application uses Role-Based Access Control (RBAC). Your dashboard view depen
 **Google OAuth:**
 You can sign in using the **"Sign in with Google"** button once your account has been provisioned by an HR administrator.
 
-*Note: For demo purposes, the Tenant Secret (Security Vault) requirement has been bypassed so you can sign in with 1-click.*
+*Sign-in works with standard session-based authentication, and sensitive employee data remains encrypted at rest on the server.*
 
 ---
 
@@ -112,7 +112,7 @@ You can sign in using the **"Sign in with Google"** button once your account has
 - **Google OAuth:** 1-click seamless login.
 - **AI Matching Engine:** Finds the best employees for a project by generating parallelized skill embeddings and scoring them via LLM.
 - **Calendar-Aware Logic:** Matching engine analyzes `availability_windows` to penalize candidates with upcoming holidays or project overlap.
-- **Enterprise Security (Vault):** E2E Encryption architecture using a Tenant Secret (KEK) to protect PII at the database level.
+- **Enterprise Security:** Sensitive employee PII is encrypted at rest using server-managed per-company encryption backed by `ENCRYPTION_KEK`.
 - **Role-Based Access Control:** Separate dashboards for HR, Managers, and Employees.
 
 ---
@@ -133,7 +133,7 @@ The core value proposition of Mapping Nexus is its high-accuracy AI employee-to-
 If you are setting up a fresh database instance (or if you just migrated to the passwordless Google OAuth flow), you will need to populate it with synthetic profiles and embeddings to test the AI engine.
 
 **1. Generate Dummy Candidates:**
-Because we bypassed the "Tenant Secret" requirement for 1-click Google OAuth, any employees created *before* this change will show up as `Employee <hash>`. To generate fresh employees with visible names:
+If you have older demo data from a previous encryption approach, some employees may still show up as `Employee <hash>`. To generate fresh employees with visible names:
 ```bash
 cd backend
 npm run generate-data
@@ -157,7 +157,7 @@ npx tsx src/scripts/backfill-embeddings.ts
 - If getting JWT or Encryption errors, ensure your `.env` contains `JWT_SECRET` and `ENCRYPTION_KEK`.
 
 **Employee Names showing as "Employee <hash>":**
-- This happens if the data was encrypted with a Tenant Secret that is no longer provided during login. Re-run `npm run generate-data` to create fresh records.
+- This usually means the record came from older demo data that no longer matches the current encrypted-at-rest scheme. Re-run `npm run generate-data` to create fresh records.
 
 **Render Deployment Failing (TS2688):**
 - Ensure your backend uses `npm run build` which should be configured to run `tsc -p tsconfig.build.json`. This dedicated build config excludes test files and `jest` types from the production build.

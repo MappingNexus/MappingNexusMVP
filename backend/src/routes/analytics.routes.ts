@@ -19,6 +19,8 @@ const MS_PER_DAY = 86400000;
 const RECENT_PROJECT_DAYS = 45;
 const BURNOUT_LOAD_PER_PROJECT = 18;
 const BURNOUT_CAPACITY_RISK_MAX = 28;
+const PROJECT_READINESS_DAYS = 60;
+const PROJECT_READINESS_AVAILABILITY_LOAD_LIMIT = 3;
 
 function getEmptyBurnoutData() {
     return {
@@ -27,6 +29,183 @@ function getEmptyBurnoutData() {
         departmentFatigue: [],
         highRiskEmployees: [],
         costPreventionROI: '₹0L',
+    };
+}
+
+function getEmptyProjectReadiness() {
+    return {
+        status: 'ready' as const,
+        upcomingProjects: 0,
+        readyProjects: 0,
+        projectsAtRisk: 0,
+        requiredSkillSlots: 0,
+        coveredSkillSlots: 0,
+        coveragePct: 100,
+        availablePeople: 0,
+        blockedPeople: 0,
+        biggestGaps: [],
+    };
+}
+
+function getWindowRange(window: { start_date: string; end_date: string }) {
+    const start = new Date(window.start_date).getTime();
+    const end = new Date(window.end_date).getTime() + MS_PER_DAY - 1;
+    return { start, end };
+}
+
+function rangesOverlap(startA: number, endA: number, startB: number, endB: number) {
+    return startA <= endB && endA >= startB;
+}
+
+function isEmployeeAvailableForWindow(
+    employee: any,
+    windows: Array<{ start_date: string; end_date: string }>,
+    projectStartDate?: string | null,
+    projectEndDate?: string | null
+) {
+    if (employee.current_project_load >= PROJECT_READINESS_AVAILABILITY_LOAD_LIMIT) {
+        return false;
+    }
+
+    const capacity = Number(employee.capacity_committed_pct || 0);
+    if (capacity >= 85) {
+        return false;
+    }
+
+    const start = projectStartDate
+        ? new Date(projectStartDate).getTime()
+        : Date.now();
+    const end = projectEndDate
+        ? new Date(projectEndDate).getTime() + MS_PER_DAY - 1
+        : start + 30 * MS_PER_DAY;
+
+    return !windows.some(window => {
+        const windowRange = getWindowRange(window);
+        return rangesOverlap(start, end, windowRange.start, windowRange.end);
+    });
+}
+
+function getProjectReadinessStatus(coveragePct: number, projectsAtRisk: number) {
+    if (projectsAtRisk === 0) return 'ready';
+    if (coveragePct >= 75) return 'watch';
+    return 'gap';
+}
+
+async function buildProjectReadinessSummary(
+    db: any,
+    companyId: string,
+    visibleIds: string[],
+    employees: any[]
+) {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const sixtyDaysFromNow = new Date(Date.now() + PROJECT_READINESS_DAYS * MS_PER_DAY).toISOString().split('T')[0];
+
+    const [{ data: projects }, { data: workforceSkills }, { data: windows }] = await Promise.all([
+        db.from('projects')
+            .select('project_id, project_name, required_skills, start_date, end_date, status')
+            .eq('company_id', companyId)
+            .in('status', ['planned', 'active'])
+            .not('start_date', 'is', null)
+            .gte('start_date', todayStr)
+            .lte('start_date', sixtyDaysFromNow),
+        db.from('skills')
+            .select('skill_name, employee_id')
+            .eq('company_id', companyId)
+            .in('employee_id', visibleIds),
+        db.from('availability_window')
+            .select('employee_id, start_date, end_date')
+            .eq('company_id', companyId)
+            .in('employee_id', visibleIds),
+    ]);
+
+    const upcomingProjects = (projects || []).filter((project: any) => project.required_skills?.length);
+    const windowsByEmployee = (windows || []).reduce((acc: Record<string, any[]>, window: any) => {
+        if (!acc[window.employee_id]) acc[window.employee_id] = [];
+        acc[window.employee_id].push(window);
+        return acc;
+    }, {});
+
+    const availableEmployeesBySkill = (workforceSkills || []).reduce((acc: Record<string, Set<string>>, skill: any) => {
+        const employee = employees.find(emp => emp.employee_id === skill.employee_id);
+        if (!employee) return acc;
+
+        const isAvailable = isEmployeeAvailableForWindow(
+            employee,
+            windowsByEmployee[employee.employee_id] || [],
+            null,
+            null
+        );
+        if (!isAvailable) return acc;
+
+        if (!acc[skill.skill_name]) acc[skill.skill_name] = new Set<string>();
+        acc[skill.skill_name].add(skill.employee_id);
+        return acc;
+    }, {});
+
+    let requiredSkillSlots = 0;
+    let coveredSkillSlots = 0;
+    let projectsAtRisk = 0;
+
+    const biggestGaps: Array<{
+        projectName: string;
+        skillName: string;
+        demand: number;
+        available: number;
+        gap: number;
+        startDate: string | null;
+    }> = [];
+
+    upcomingProjects.forEach((project: any) => {
+        let projectCovered = true;
+        (project.required_skills || []).forEach((skill: any) => {
+            const skillName = String(skill.skill_name || skill.name || '').trim().toLowerCase();
+            if (!skillName) return;
+
+            const demand = Math.max(1, Number(skill.count || 1));
+            const available = availableEmployeesBySkill[skillName]?.size || 0;
+            requiredSkillSlots += demand;
+            coveredSkillSlots += Math.min(demand, available);
+
+            if (available < demand) {
+                projectCovered = false;
+                biggestGaps.push({
+                    projectName: project.project_name,
+                    skillName,
+                    demand,
+                    available,
+                    gap: demand - available,
+                    startDate: project.start_date || null,
+                });
+            }
+        });
+
+        if (!projectCovered) {
+            projectsAtRisk += 1;
+        }
+    });
+
+    const availablePeople = employees.filter(employee =>
+        isEmployeeAvailableForWindow(employee, windowsByEmployee[employee.employee_id] || [], null, null)
+    ).length;
+    const blockedPeople = Math.max(0, employees.length - availablePeople);
+    const coveragePct = requiredSkillSlots > 0
+        ? Math.round((coveredSkillSlots / requiredSkillSlots) * 100)
+        : 100;
+
+    return {
+        status: getProjectReadinessStatus(coveragePct, projectsAtRisk),
+        upcomingProjects: upcomingProjects.length,
+        readyProjects: Math.max(0, upcomingProjects.length - projectsAtRisk),
+        projectsAtRisk,
+        requiredSkillSlots,
+        coveredSkillSlots,
+        coveragePct,
+        availablePeople,
+        blockedPeople,
+        biggestGaps: biggestGaps
+            .sort((a, b) => b.gap - a.gap || String(a.startDate || '').localeCompare(String(b.startDate || '')))
+            .slice(0, 5),
     };
 }
 
@@ -77,6 +256,7 @@ router.get('/overview', requireAuth, requireRole('hr', 'manager'), async (req: R
                     totalEmployees: 0, activeCount: 0, benchCount: 0,
                     burnoutRiskCount: 0, skillGapCount: 0, healthScore: 0,
                     mobilityRate: 0, departmentBreakdown: [], utilizationHeatmap: [],
+                    projectReadiness: getEmptyProjectReadiness(),
                 },
             });
         }
@@ -109,6 +289,7 @@ router.get('/overview', requireAuth, requireRole('hr', 'manager'), async (req: R
             .select('skill_name, proficiency, last_used_date, employee_id')
             .eq('company_id', user.companyId)
             .in('employee_id', visibleIds);
+        const projectReadiness = await buildProjectReadinessSummary(db, user.companyId, visibleIds, emps);
 
         const dormantSkillCount = new Set(
             (allSkills || [])
@@ -185,6 +366,7 @@ router.get('/overview', requireAuth, requireRole('hr', 'manager'), async (req: R
                 mobilityRate,
                 departmentBreakdown,
                 utilizationHeatmap,
+                projectReadiness,
             },
         });
     } catch (err: any) {
@@ -361,10 +543,18 @@ router.get('/skills', requireAuth, requireRole('hr', 'manager'), async (req: Req
         const user = (req as AuthenticatedRequest).user;
         const db = supabaseAdmin;
         const visibleIds = await getVisibleEmployeeIds(db, user);
-
-        const [{ data: projects }, { data: workforceSkills }] = await Promise.all([
+        const [{ data: projects }, { data: workforceSkills }, { data: employees }, { data: windows }] = await Promise.all([
             db.from('projects').select('required_skills, status, start_date').eq('company_id', user.companyId),
             db.from('skills').select('skill_name, employee_id').eq('company_id', user.companyId).in('employee_id', visibleIds),
+            db.from('employees')
+                .select('employee_id, current_project_load, capacity_committed_pct')
+                .eq('company_id', user.companyId)
+                .eq('is_archived', false)
+                .in('employee_id', visibleIds),
+            db.from('availability_window')
+                .select('employee_id, start_date, end_date')
+                .eq('company_id', user.companyId)
+                .in('employee_id', visibleIds),
         ]);
 
         const demandMap: Record<string, { demand: number; active: number; planned: number; recent: number }> = {};
@@ -387,7 +577,35 @@ router.get('/skills', requireAuth, requireRole('hr', 'manager'), async (req: Req
             if (!acc[skill.skill_name]) acc[skill.skill_name] = new Set<string>();
             acc[skill.skill_name].add(skill.employee_id);
             return acc;
+        }, {} as Record<string, Set<string>>);
+
+        const windowsByEmployee = (windows || []).reduce((acc: Record<string, any[]>, window: any) => {
+            if (!acc[window.employee_id]) acc[window.employee_id] = [];
+            acc[window.employee_id].push(window);
+            return acc;
         }, {});
+
+        const employeeById = (employees || []).reduce((acc: Record<string, any>, employee: any) => {
+            acc[employee.employee_id] = employee;
+            return acc;
+        }, {});
+
+        const availabilityAwareWorkforceMap = (workforceSkills || []).reduce((acc, skill) => {
+            const employee = employeeById[skill.employee_id];
+            if (!employee) return acc;
+
+            const isAvailable = isEmployeeAvailableForWindow(
+                employee,
+                windowsByEmployee[employee.employee_id] || [],
+                null,
+                null
+            );
+            if (!isAvailable) return acc;
+
+            if (!acc[skill.skill_name]) acc[skill.skill_name] = new Set<string>();
+            acc[skill.skill_name].add(skill.employee_id);
+            return acc;
+        }, {} as Record<string, Set<string>>);
 
         const allSkillEntries = Object.entries(demandMap);
 
@@ -447,7 +665,7 @@ router.get('/skills', requireAuth, requireRole('hr', 'manager'), async (req: Req
 
         const skillGaps = allSkillEntries
             .map(([name, data]) => {
-                const available = workforceMap[name]?.size || 0;
+                const available = availabilityAwareWorkforceMap[name]?.size || 0;
                 return { name, total: data.demand, available, gap: Math.max(0, data.demand - available) };
             })
             .filter(g => g.gap > 0)

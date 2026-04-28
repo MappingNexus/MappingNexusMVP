@@ -157,6 +157,19 @@ async function runRetrievalQA(
     return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 }
 
+type CostBand = 'below average' | 'near average' | 'above average';
+
+function getCostBand(cost: number | null, averageCost: number | null): CostBand | null {
+    if (cost == null || averageCost == null || averageCost <= 0) {
+        return null;
+    }
+
+    const ratio = cost / averageCost;
+    if (ratio < 0.9) return 'below average';
+    if (ratio > 1.1) return 'above average';
+    return 'near average';
+}
+
 /**
  * Calculate rule-based confidence score for an employee against requirements.
  */
@@ -531,13 +544,23 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
                     costPerDay: user.role === 'hr' ? costValue : undefined,
                 },
                 ...scores,
-                roiEstimate: (costValue != null && companyAvgCost != null) ? {
-                    candidateCostPerDay: costValue,
-                    companyAvgCostPerDay: Math.round(companyAvgCost),
-                    savingsPerDay: Math.round(companyAvgCost - costValue),
-                    savingsPercent: Math.round(((companyAvgCost - costValue) / companyAvgCost) * 100),
-                    projected90DaySavings: Math.round((companyAvgCost - costValue) * 90),
-                } : null,
+                roiEstimate: (() => {
+                    if (costValue == null || companyAvgCost == null) return null;
+
+                    const costBand = getCostBand(costValue, companyAvgCost);
+                    if (user.role === 'hr') {
+                        return {
+                            costBand,
+                            candidateCostPerDay: costValue,
+                            companyAvgCostPerDay: Math.round(companyAvgCost),
+                            savingsPerDay: Math.round(companyAvgCost - costValue),
+                            savingsPercent: Math.round(((companyAvgCost - costValue) / companyAvgCost) * 100),
+                            projected90DaySavings: Math.round((companyAvgCost - costValue) * 90),
+                        };
+                    }
+
+                    return costBand ? { costBand } : null;
+                })(),
                 semanticScore: (searchMethod === 'semantic')
                     ? (matchingSkills || []).find((ms: any) => ms.employee_id === emp.employee_id)?.similarity
                     : undefined,
@@ -609,7 +632,7 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
             totalCandidatesScanned: employees.length,
             aiEnhanced,
             searchMethod,
-            companyAvgCostPerDay: companyAvgCost ? Math.round(companyAvgCost) : null,
+            companyAvgCostPerDay: user.role === 'hr' && companyAvgCost ? Math.round(companyAvgCost) : null,
             filtersApplied: [
                 `${reqSkills.length} skill(s) required`,
                 searchMethod === 'semantic' ? 'Semantic vector search' : 'Keyword matching',

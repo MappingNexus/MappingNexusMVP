@@ -22,9 +22,6 @@ async function seed() {
         process.exit(1);
     }
     
-    // The companySecret is an out-of-band shared password used purely for client-side PII 
-    // encryption/decryption in transit. The DB never stores it.
-    const companySecret = 'AcmeSecret123';
     console.log(onboardData.success ? '✅ Company created!' : '✅ Company already existed. Proceeding.');
 
     // 2. Login
@@ -49,8 +46,7 @@ async function seed() {
     // 3. Create Employees
     const headers = { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'X-Company-Secret': companySecret
+        'Authorization': `Bearer ${token}`
     };
 
     const employeesToCreate = [
@@ -106,7 +102,7 @@ async function seed() {
     console.log('Use these credentials to log in:');
     console.log('Email: jane.admin@acmeglobal.com');
     console.log('Password: ChangeMe123!');
-    console.log('Tenant Secret:', companySecret);
+    console.log('Security: employee PII is encrypted at rest by the server.');
     console.log('================================\n');
 }
 

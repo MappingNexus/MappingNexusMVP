@@ -93,12 +93,12 @@ CREATE TABLE IF NOT EXISTS public.skills (
     skill_name      text NOT NULL,
     proficiency     skill_proficiency NOT NULL DEFAULT 'intermediate',
     last_used_date  date,
-    embedding       vector(1536),   -- pgvector: generated from skill_name + proficiency
+    embedding       vector(384),   -- pgvector: generated from skill_name + proficiency
     created_at      timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.skills IS 'Per-employee skills with proficiency and pgvector embedding for semantic matching.';
-COMMENT ON COLUMN public.skills.embedding IS 'vector(1536) — generated from skill_name + proficiency context. Used by AI matching engine.';
+COMMENT ON COLUMN public.skills.embedding IS 'vector(384) — generated from skill_name + proficiency context. Used by AI matching engine.';
 COMMENT ON COLUMN public.skills.company_id IS 'Denormalized from employees for RLS performance. MUST match employees.company_id.';
 
 -- ============================================================

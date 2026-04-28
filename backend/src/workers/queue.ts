@@ -8,14 +8,13 @@ export const redisConnection = new Redis(redisUrl, {
     retryStrategy: () => null, // Disable retries to prevent console spam
 });
 
-redisConnection.on('error', () => {}); // Suppress error logs
+if (typeof (redisConnection as any).on === 'function') {
+    redisConnection.on('error', () => {}); // Suppress noisy local Redis errors
+}
 
-// Mock embeddingQueue to bypass BullMQ Redis connection for testing Calendar Sync
-export const embeddingQueue = {
-    add: async (name: string, data: any, opts: any) => {
-        console.log(`[Mock Queue] Job ${name} added, but Redis is disabled locally.`);
-    }
-} as any;
+export const embeddingQueue = new Queue('embedding-queue', {
+    connection: redisConnection,
+});
 
 /**
  * Enqueue a job to generate and save an embedding vector for an employee's skills.
