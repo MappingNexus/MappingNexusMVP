@@ -31,7 +31,6 @@ const AUTH_REFRESH_EXEMPT_PATHS = new Set([
 const TOKEN_KEY = 'nexus_access_token';
 const REFRESH_KEY = 'nexus_refresh_token';
 const USER_KEY = 'nexus_user';
-const SECRET_KEY = 'nexus_company_secret';
 
 export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
 export function getUser(): UserProfile | null {
@@ -47,15 +46,6 @@ export function clearSession() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(SECRET_KEY);
-}
-
-export function setCompanySecret(secret: string) {
-    localStorage.setItem(SECRET_KEY, secret);
-}
-
-export function getCompanySecret(): string | null {
-    return localStorage.getItem(SECRET_KEY);
 }
 
 export function getErrorMessage(result: unknown, fallback: string): string {
@@ -75,8 +65,6 @@ function headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
     const token = getToken();
     if (token) h['Authorization'] = `Bearer ${token}`;
-    const companySecret = getCompanySecret();
-    if (companySecret) h['X-Company-Secret'] = companySecret;
     return h;
 }
 
@@ -233,26 +221,24 @@ async function request<T = any>(path: string, options?: RequestInit): Promise<T>
 
 // ============ Auth ============
 
-export async function login(email: string, password: string, companySecret: string) {
+export async function login(email: string, password: string) {
     const data = await request('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
     });
     if (data.success && data.session && data.user) {
         setSession(data.session, data.user);
-        setCompanySecret(companySecret);
     }
     return data;
 }
 
-export async function loginWithGoogle(idToken: string, companySecret: string) {
+export async function loginWithGoogle(idToken: string) {
     const data = await request('/api/auth/google', {
         method: 'POST',
         body: JSON.stringify({ idToken }),
     });
     if (data.success && data.session && data.user) {
         setSession(data.session, data.user);
-        setCompanySecret(companySecret);
     }
     return data;
 }
@@ -502,7 +488,7 @@ export async function runMatch(requirements: {
         success: boolean; matches: MatchResult[];
         totalCandidatesScanned: number; aiEnhanced: boolean;
         searchMethod: 'semantic' | 'keyword';
-        companyAvgCostPerDay: number | null;
+        companyAvgCostPerDay?: number | null;
         filtersApplied: string[];
     }>('/api/match', {
         method: 'POST',

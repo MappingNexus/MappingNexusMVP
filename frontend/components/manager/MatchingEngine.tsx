@@ -10,6 +10,7 @@ const SKILL_SUGGESTIONS = ['React', 'Python', 'AWS', 'Node.js', 'TypeScript', 'S
 const SENIORITY = ['', 'junior', 'mid', 'senior', 'lead', 'principal'];
 
 const MatchingEngine: React.FC = () => {
+    const [projectName, setProjectName] = useState('');
     const [skills, setSkills] = useState<{ name: string; priority: 'Essential' | 'Preferred' }[]>([]);
     const [newSkill, setNewSkill] = useState('');
     const [brief, setBrief] = useState('');
@@ -23,7 +24,6 @@ const MatchingEngine: React.FC = () => {
     const [matchError, setMatchError] = useState<string | null>(null);
     const [aiEnhanced, setAiEnhanced] = useState(false);
     const [searchMethod, setSearchMethod] = useState<'semantic' | 'keyword'>('keyword');
-    const [companyAvgCost, setCompanyAvgCost] = useState<number | null>(null);
 
     // Assignment state
     const [projects, setProjects] = useState<Project[]>([]);
@@ -32,16 +32,66 @@ const MatchingEngine: React.FC = () => {
     const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
     const [assignError, setAssignError] = useState<string | null>(null);
     const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
+    const [projectSaveError, setProjectSaveError] = useState<string | null>(null);
+    const [projectSaveSuccess, setProjectSaveSuccess] = useState<string | null>(null);
+    const [savingProject, setSavingProject] = useState(false);
 
     // Load projects for the assignment selector
-    useEffect(() => {
-        api.getProjects().then(res => {
-            if (res.success) {
-                // Only show planned/active projects
-                setProjects((res.projects || []).filter(p => p.status !== 'completed'));
+    const loadProjects = async (nextSelectedProjectId?: string) => {
+        const res = await api.getProjects();
+        if (res.success) {
+            const availableProjects = (res.projects || []).filter(p => p.status !== 'completed');
+            setProjects(availableProjects);
+            if (nextSelectedProjectId && availableProjects.some(project => project.project_id === nextSelectedProjectId)) {
+                setSelectedProjectId(nextSelectedProjectId);
             }
-        }).catch(() => {});
+        }
+    };
+
+    useEffect(() => {
+        loadProjects().catch(() => {});
     }, []);
+
+    const saveProject = async () => {
+        if (!projectName.trim()) {
+            setProjectSaveError('Project name is required before saving.');
+            return;
+        }
+        if (skills.length === 0) {
+            setProjectSaveError('Add at least one required skill before saving the project.');
+            return;
+        }
+
+        setSavingProject(true);
+        setProjectSaveError(null);
+        setProjectSaveSuccess(null);
+
+        try {
+            const res = await api.createProject({
+                projectName: projectName.trim(),
+                requiredSkills: skills.map(skill => ({
+                    skill_name: skill.name.trim(),
+                    proficiency: skill.priority === 'Essential' ? 'expert' : 'intermediate',
+                    count: 1,
+                })),
+                startDate: projectStart || undefined,
+                endDate: projectEnd || undefined,
+                status: 'planned',
+            });
+
+            if (res.success) {
+                const createdProjectId = res.project?.project_id as string | undefined;
+                await loadProjects(createdProjectId);
+                setProjectSaveSuccess(`Project "${projectName.trim()}" saved and ready for assignment.`);
+            } else {
+                setProjectSaveError(api.getErrorMessage(res, 'Failed to save project.'));
+            }
+        } catch {
+            setProjectSaveError('Failed to save project.');
+        } finally {
+            setSavingProject(false);
+        }
+    };
 
     const addSkill = (name: string) => {
         if (!name.trim() || skills.find(s => s.name.toLowerCase() === name.toLowerCase())) return;
@@ -73,11 +123,9 @@ const MatchingEngine: React.FC = () => {
             setResults(res.matches);
             setAiEnhanced(res.aiEnhanced);
             setSearchMethod(res.searchMethod || 'keyword');
-            setCompanyAvgCost(res.companyAvgCostPerDay || null);
         } else {
             setAiEnhanced(false);
             setSearchMethod('keyword');
-            setCompanyAvgCost(null);
             setMatchError(api.getErrorMessage(res, 'Matching failed. Please try again.'));
         }
         setScanning(false);
@@ -143,6 +191,21 @@ const MatchingEngine: React.FC = () => {
             {/* Input Panel */}
             <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
                 <h3 className="font-black text-gray-900 dark:text-white uppercase tracking-tight mb-4">Mission Brief</h3>
+                <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-[1.5fr,auto]">
+                    <input
+                        value={projectName}
+                        onChange={e => setProjectName(e.target.value)}
+                        placeholder="Project name..."
+                        className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white text-sm outline-none focus:border-blue-500 dark:border-[#00FF66] font-mono transition-colors"
+                    />
+                    <button
+                        onClick={saveProject}
+                        disabled={savingProject || skills.length === 0}
+                        className="border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white hover:border-blue-500 dark:hover:border-[#00FF66] uppercase tracking-widest text-xs px-6 py-3 transition-colors disabled:opacity-50"
+                    >
+                        {savingProject ? 'Saving Project...' : 'Save Project'}
+                    </button>
+                </div>
                 <textarea value={brief} onChange={e => setBrief(e.target.value)} rows={3} placeholder="Describe the project, goals, and context..."
                     className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white text-sm placeholder-[#8A8A8A] outline-none focus:border-blue-500 dark:border-[#00FF66] resize-none mb-4 font-mono transition-colors" />
 
@@ -211,6 +274,16 @@ const MatchingEngine: React.FC = () => {
                         {matchError}
                     </div>
                 )}
+                {projectSaveError && (
+                    <div className="mt-4 border border-[#FF3333]/20 bg-[#FF3333]/10 px-4 py-3 text-sm text-[#FF3333]">
+                        {projectSaveError}
+                    </div>
+                )}
+                {projectSaveSuccess && (
+                    <div className="mt-4 border border-blue-500 dark:border-[#00FF66]/20 bg-[#00FF66]/10 px-4 py-3 text-sm text-blue-500 dark:text-[#00FF66]">
+                        {projectSaveSuccess}
+                    </div>
+                )}
             </div>
 
             {/* Results */}
@@ -233,7 +306,7 @@ const MatchingEngine: React.FC = () => {
                                 ))}
                             </select>
                             {projects.length === 0 && (
-                                <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF9900]">No active projects found. Ask HR to create a project first.</span>
+                                <span className="text-[10px] font-mono uppercase tracking-widest text-[#FF9900]">No active projects yet. Save this mission brief as a project first.</span>
                             )}
                         </div>
                         {assignError && (
@@ -269,7 +342,7 @@ const MatchingEngine: React.FC = () => {
                                     {m.aiExplanation && <p className="text-sm text-gray-500 dark:text-[#8a8a8a] mt-3 bg-[#111111] border border-gray-200 dark:border-white/10 p-3 italic">{m.aiExplanation}</p>}
 
                                     {/* ROI Estimate */}
-                                    {m.roiEstimate && (
+                                    {false && m.roiEstimate && (
                                         <div className={`mt-3 p-3 flex items-center gap-3 border ${m.roiEstimate.savingsPerDay > 0 ? 'bg-[#00FF66]/10 border-blue-500 dark:border-[#00FF66]/20' : 'bg-[#FF3333]/10 border-[#FF3333]/20'}`}>
                                             <TrendingDown className={`w-5 h-5 ${m.roiEstimate.savingsPerDay > 0 ? 'text-blue-500 dark:text-[#00FF66]' : 'text-[#FF3333]'}`} />
                                             <div>
@@ -284,6 +357,19 @@ const MatchingEngine: React.FC = () => {
                                                         {m.roiEstimate.projected90DaySavings > 0 ? '+' : ''}₹{m.roiEstimate.projected90DaySavings.toLocaleString()}
                                                     </span>
                                                     {' • '}Candidate: ₹{m.roiEstimate.candidateCostPerDay.toLocaleString()}/day vs avg ₹{m.roiEstimate.companyAvgCostPerDay.toLocaleString()}/day
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {m.roiEstimate?.costBand && (
+                                        <div className={`mt-3 p-3 flex items-center gap-3 border ${m.roiEstimate.costBand === 'below average' ? 'bg-[#00FF66]/10 border-blue-500 dark:border-[#00FF66]/20' : m.roiEstimate.costBand === 'above average' ? 'bg-[#FF3333]/10 border-[#FF3333]/20' : 'bg-white/5 border-gray-200 dark:border-white/10'}`}>
+                                            <TrendingDown className={`w-5 h-5 ${m.roiEstimate.costBand === 'below average' ? 'text-blue-500 dark:text-[#00FF66]' : m.roiEstimate.costBand === 'above average' ? 'text-[#FF3333]' : 'text-gray-500 dark:text-[#8a8a8a]'}`} />
+                                            <div>
+                                                <p className={`text-sm font-medium ${m.roiEstimate.costBand === 'below average' ? 'text-blue-500 dark:text-[#00FF66]' : m.roiEstimate.costBand === 'above average' ? 'text-[#FF3333]' : 'text-gray-900 dark:text-white'}`}>
+                                                    Cost position: {m.roiEstimate.costBand}
+                                                </p>
+                                                <p className="text-xs text-gray-500 dark:text-[#8a8a8a] mt-0.5 font-mono">
+                                                    Relative to your company average cost baseline.
                                                 </p>
                                             </div>
                                         </div>

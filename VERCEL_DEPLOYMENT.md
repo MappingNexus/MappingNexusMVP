@@ -1,148 +1,75 @@
-# Vercel Deployment Guide - Frontend Only
+# Vercel Deployment
 
-## Quick Setup for Frontend-Only Deployment
+This repo deploys the frontend to Vercel from the `frontend` directory.
 
-You only want to deploy the frontend React app. Here's the simple setup:
+Current frontend stack:
 
-## Next Steps
+- Vite
+- React
+- TypeScript
 
-### 1. Configure Vercel Project Settings
+## Vercel Project Settings
 
-In your Vercel dashboard:
+Use these settings in Vercel:
 
-**Build Settings:**
-- **Framework Preset**: `Vite` (Vercel will auto-detect)
-- **Root Directory**: `frontend` ⬅️ **IMPORTANT: Set this to `frontend`**
-- **Build Command**: `npm run build` (or leave empty, Vite preset handles it)
-- **Output Directory**: `dist` (or leave empty, Vite preset handles it)
-- **Install Command**: (leave empty, Vite preset handles it)
+- Framework Preset: `Vite`
+- Root Directory: `frontend`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Install Command: `npm install`
 
-**That's it!** Vercel will:
-1. Navigate to `frontend/` directory
-2. Run `npm install`
-3. Run `npm run build`
-4. Serve the `dist/` folder as static site
+## Required Frontend Environment Variables
 
-### 2. Environment Variables (Optional)
+Set these in the Vercel project:
 
-If your frontend needs environment variables, add them in Vercel:
-
-**Frontend Environment Variables:**
-- `VITE_GROQ_API_KEY` - Your Groq API key (if needed)
-- `VITE_API_URL` - Your backend API URL (if backend is deployed elsewhere)
-
-**Note:** Vite only exposes variables prefixed with `VITE_` to the frontend.
-
-### 3. Deploy
-
-- Push to your main branch (auto-deploys)
-- Or manually trigger deployment in Vercel dashboard
-
-**Environment Variables:**
-Add these in Project Settings → Environment Variables:
-
-```
-DATABASE_URL=your-postgresql-connection-string
-NODE_ENV=production
-VITE_GROQ_API_KEY=your-groq-api-key
+```env
+VITE_API_URL=https://<your-render-backend-host>
+VITE_GOOGLE_CLIENT_ID=<your-google-client-id>
 ```
 
-**Optional:**
-```
-FRONTEND_URL=https://your-project.vercel.app
-EMAIL_SERVICE=gmail
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password
-```
+Optional:
 
-### 3. Redeploy
-
-After pushing, Vercel will automatically redeploy. Or manually trigger:
-- Go to Deployments → Click "Redeploy"
-
-### 4. Run Database Migrations
-
-After first successful deployment, run migrations:
-
-```bash
-# Option 1: Using Vercel CLI
-vercel env pull .env.local
-cd backend
-npx prisma migrate deploy
-npx prisma generate
-
-# Option 2: Direct connection
-cd backend
-export DATABASE_URL="your-production-database-url"
-npx prisma migrate deploy
-npx prisma generate
-npm run seed
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
-## Troubleshooting
+What they do:
 
-### Build Fails
-- **Check Root Directory**: Must be set to `frontend` (not `.`)
-- **Check Framework**: Should be `Vite` (auto-detected)
-- **Check Build Logs**: Vercel dashboard → Deployments → View logs
+- `VITE_API_URL`: points the frontend to the deployed Express backend.
+- `VITE_GOOGLE_CLIENT_ID`: enables Google sign-in in the frontend.
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`: optional browser Supabase client for password recovery support.
 
-### API Calls Fail (404)
-- Your frontend calls `/api/*` but there's no backend deployed
-- **Option 1**: Deploy backend separately and update `VITE_API_URL` env var
-- **Option 2**: Update `frontend/services/api.ts` to use full backend URL
+## Backend Expectations
 
-### Environment Variables Not Working
-- Vite only exposes variables starting with `VITE_`
-- Make sure you prefix them: `VITE_API_URL`, `VITE_GROQ_API_KEY`, etc.
-- Restart deployment after adding env vars
+Vercel only hosts the frontend in this setup. The backend is expected to be deployed separately, using the current repo’s Render-based setup in:
 
-## File Structure
+- [render.yaml](/E:/MappingNexusMVP/MappingNexusMVP/render.yaml)
 
-```
-MappingNexus/
-├── frontend/           # React app (THIS IS YOUR ROOT IN VERCEL)
-│   ├── dist/          # Build output (created during build)
-│   ├── package.json
-│   └── vite.config.ts
-└── backend/           # Express API (NOT DEPLOYED - ignored by Vercel)
-    └── ...
-```
+The frontend will call the backend URL configured in `VITE_API_URL`.
 
-## How It Works
+## Deploy Steps
 
-1. **Vercel Settings**: Root Directory = `frontend`
-2. **Build Phase**: 
-   - Vercel navigates to `frontend/`
-   - Runs `npm install`
-   - Runs `npm run build` (which runs `tsc && vite build`)
-   - Outputs to `frontend/dist/`
+1. Push the repo to GitHub.
+2. Import the repo into Vercel.
+3. Set the project Root Directory to `frontend`.
+4. Add the required environment variables.
+5. Deploy.
 
-3. **Runtime**:
-   - Static files served from `dist/`
-   - All routes serve your React app (SPA)
-   - API calls to `/api/*` will fail unless you deploy backend separately
+## Verify The Deployment
 
-## Important Notes
+After deploy:
 
-- ✅ **Simple**: Just set Root Directory to `frontend`
-- ✅ **No Backend**: Backend folder is completely ignored
-- ✅ **Static Site**: Pure frontend deployment
-- ⚠️ **API Calls**: If frontend calls `/api/*`, those will 404 unless you deploy backend elsewhere
-- ✅ **Auto-deploy**: Pushing to main branch triggers deployment
+1. Open the Vercel site URL.
+2. Confirm the login page renders.
+3. Confirm browser requests go to the expected backend from `VITE_API_URL`.
+4. Log in and verify the app loads dashboard data successfully.
 
-## Testing Deployment
+## Common Issues
 
-1. Visit: `https://your-project.vercel.app`
-2. Check API: `https://your-project.vercel.app/api/health`
-3. Test login with credentials from README.md
-
-## Need Help?
-
-Check Vercel deployment logs:
-- Dashboard → Deployments → Click deployment → View Function Logs
-
-Common issues are usually:
-- Missing environment variables
-- Database connection problems
-- Build command errors
-- Missing dependencies
+- Blank or broken app on load:
+  - Check `VITE_API_URL` and `VITE_GOOGLE_CLIENT_ID`.
+- API requests failing:
+  - Confirm the Render backend is live and its CORS settings include the Vercel frontend origin.
+- Password recovery browser flow unavailable:
+  - Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` if you want that path enabled.

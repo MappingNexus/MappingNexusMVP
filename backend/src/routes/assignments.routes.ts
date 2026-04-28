@@ -18,6 +18,7 @@ import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/au
 import { logAction, AuditActions } from '../services/audit.service.js';
 
 const router = Router();
+const DEFAULT_CAPACITY_PER_ASSIGNMENT_PCT = 25;
 
 async function getManagerVisibleEmployeeIds(companyId: string, managerId: string): Promise<string[]> {
     const { data: memberships } = await supabaseAdmin
@@ -28,6 +29,26 @@ async function getManagerVisibleEmployeeIds(companyId: string, managerId: string
         .eq('teams.manager_id', managerId);
 
     return (memberships || []).map((membership: any) => membership.employee_id);
+}
+
+async function syncEmployeeCapacitySnapshot(companyId: string, employeeId: string) {
+    const { count } = await supabaseAdmin
+        .from('assignments')
+        .select('assignment_id', { count: 'exact' })
+        .eq('employee_id', employeeId)
+        .eq('company_id', companyId);
+
+    const currentProjectLoad = count ?? 0;
+    const capacityCommittedPct = Math.min(100, currentProjectLoad * DEFAULT_CAPACITY_PER_ASSIGNMENT_PCT);
+
+    await supabaseAdmin
+        .from('employees')
+        .update({
+            current_project_load: currentProjectLoad,
+            capacity_committed_pct: capacityCommittedPct,
+        })
+        .eq('employee_id', employeeId)
+        .eq('company_id', companyId);
 }
 
 /**
@@ -137,6 +158,8 @@ router.post('/', requireAuth, requireRole('hr', 'manager'), async (req: Request,
                 projectId,
             },
         }).catch(() => {});
+
+        await syncEmployeeCapacitySnapshot(user.companyId, employeeId);
 
         res.status(201).json({ success: true, assignment });
     } catch (err: any) {
@@ -255,6 +278,8 @@ router.delete('/:id', requireAuth, requireRole('hr', 'manager'), async (req: Req
             },
         }).catch(() => {});
 
+        await syncEmployeeCapacitySnapshot(user.companyId, assignment.employee_id);
+
         res.json({ success: true, message: 'Assignment removed.' });
     } catch (err: any) {
         res.status(500).json({ success: false, message: err.message });
@@ -320,7 +345,10 @@ router.post('/recalculate', requireAuth, requireRole('hr'), async (req: Request,
 
                 await supabaseAdmin
                     .from('employees')
-                    .update({ current_project_load: count ?? 0 })
+                    .update({
+                        current_project_load: count ?? 0,
+                        capacity_committed_pct: Math.min(100, (count ?? 0) * DEFAULT_CAPACITY_PER_ASSIGNMENT_PCT),
+                    })
                     .eq('employee_id', empId)
                     .eq('company_id', user.companyId); // company isolation required
             }

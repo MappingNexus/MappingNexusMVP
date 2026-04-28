@@ -322,9 +322,12 @@ class SupabaseShimClient {
         try {
             if (fn === 'match_skills_by_embedding') {
                 const { query_embedding, match_company_id, match_threshold = 0.3, match_count = 50 } = params;
+                const vector = Array.isArray(query_embedding)
+                    ? query_embedding
+                    : JSON.parse(String(query_embedding || '[]'));
                 const result = await pool.query(
                     `SELECT * FROM public.match_skills_by_embedding($1::vector, $2, $3, $4)`,
-                    [`[${query_embedding.join(',')}]`, match_company_id, match_threshold, match_count]
+                    [`[${vector.join(',')}]`, match_company_id, match_threshold, match_count]
                 );
                 return { data: result.rows, error: null };
             }

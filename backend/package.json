@@ -10,12 +10,13 @@
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
     "generate-data": "tsx src/scripts/generate-synthetic-data.ts",
     "backfill-embeddings": "tsx src/scripts/backfill-embeddings.ts",
+    "reindex-embeddings": "tsx src/scripts/backfill-embeddings.ts",
     "onboard-company": "tsx src/scripts/onboard-company.ts"
   },
   "dependencies": {
     "@langchain/openai": "^1.4.1",
     "@xenova/transformers": "^2.17.2",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "npm:bcryptjs@^3.0.3",
     "bullmq": "^5.76.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
