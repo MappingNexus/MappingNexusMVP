@@ -34,7 +34,7 @@ import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { verifyDatabaseConnection } from './config/db.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
-import './workers/embedding.worker.js';
+// import './workers/embedding.worker.js'; // Disabled to prevent Redis connection spam
 import { startCalendarSyncScheduler } from './workers/calendar-sync.scheduler.js';
 
 // Route imports

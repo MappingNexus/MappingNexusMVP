@@ -52,7 +52,7 @@ const HRBurnoutRadar: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-2">Global Fatigue Index</p>
                     <p className="text-4xl font-black text-gray-900 dark:text-white">{data.globalFatigueIndex}%</p>
                     {fatigueChange === null ? (
@@ -63,12 +63,12 @@ const HRBurnoutRadar: React.FC = () => {
                         </p>
                     )}
                 </div>
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-2">High Risk</p>
                     <p className="text-4xl font-black text-[#FF3333]">{data.highRiskEmployees.length}</p>
                     <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono mt-1">employees flagged</p>
                 </div>
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-2">Prevention ROI</p>
                     <p className="text-4xl font-black text-blue-500 dark:text-[#00FF66]">{data.costPreventionROI}</p>
                     <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono mt-1">estimated savings</p>
@@ -76,14 +76,14 @@ const HRBurnoutRadar: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">Department Fatigue</h3>
                     {data.departmentFatigue.length > 0 ? (
                         <ResponsiveContainer width="100%" height={250}>
                             <BarChart data={data.departmentFatigue}>
                                 <XAxis dataKey="name" tick={{ fill: '#8A8A8A', fontSize: 11 }} axisLine={{ stroke: '#2A2A2A' }} tickLine={false} />
                                 <YAxis tick={{ fill: '#8A8A8A', fontSize: 11 }} axisLine={{ stroke: '#2A2A2A' }} tickLine={false} />
-                                <Tooltip contentStyle={{ backgroundColor: '#111111', border: '1px solid #2A2A2A', borderRadius: 0, fontFamily: 'monospace', fontSize: 12 }} />
+                                <Tooltip contentStyle={{ backgroundColor: 'var(--tooltip-bg, #fff)', border: '1px solid #e5e7eb', borderRadius: 0, fontFamily: 'monospace', fontSize: 12, color: '#111' }} />
                                 <Bar dataKey="value" fill="#9D4EDD" />
                             </BarChart>
                         </ResponsiveContainer>
@@ -98,7 +98,7 @@ const HRBurnoutRadar: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">High Risk Employees</h3>
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                         {data.highRiskEmployees.map(emp => (

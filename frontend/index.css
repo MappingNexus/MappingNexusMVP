@@ -19,3 +19,27 @@
     transform: translateX(100%);
   }
 }
+
+/* Recharts tooltip adapts to light/dark */
+:root {
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #e5e7eb;
+  --tooltip-text: #111111;
+}
+
+.dark {
+  --tooltip-bg: #111111;
+  --tooltip-border: #2a2a2a;
+  --tooltip-text: #e5e7eb;
+}
+
+/* select element: ensure option text visible in both themes */
+select option {
+  background-color: #ffffff;
+  color: #111111;
+}
+
+.dark select option {
+  background-color: #1a1a1c;
+  color: #ffffff;
+}

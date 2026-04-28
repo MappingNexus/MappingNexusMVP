@@ -70,9 +70,9 @@ const NexusMap: React.FC = () => {
                     <h1 className="text-3xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tight uppercase">NEXUS COMMAND CENTER</h1>
                     <div className="flex flex-wrap items-center gap-3 mt-4 font-mono text-gray-500 dark:text-[#8a8a8a] text-xs uppercase tracking-widest">
                         <span>{data.totalEmployees} EMPLOYEES</span>
-                        <span className="text-[#333333]">//</span>
+                        <span className="text-gray-300 dark:text-[#333333]">//</span>
                         <span>[ VIEWED {currentTimestamp} ]</span>
-                        <span className="text-[#333333]">//</span>
+                        <span className="text-gray-300 dark:text-[#333333]">//</span>
                         <div className="flex items-center gap-2 text-blue-500 dark:text-[#00FF66]">
                             <div className="w-2 h-2 rounded-full bg-[#00FF66] animate-pulse"></div>
                             LIVE
@@ -81,7 +81,7 @@ const NexusMap: React.FC = () => {
                 </div>
                 <button 
                     onClick={fetchData}
-                    className="flex items-center justify-center gap-2 border border-[#333333] bg-white/50 dark:bg-black/50 backdrop-blur-md hover:bg-white hover:text-black text-gray-900 dark:text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors"
+                    className="flex items-center justify-center gap-2 border border-gray-300 dark:border-[#333333] bg-white/50 dark:bg-black/50 backdrop-blur-md hover:bg-gray-100 dark:hover:bg-white hover:text-black text-gray-900 dark:text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors"
                 >
                     <RefreshCw className="w-3.5 h-3.5" />
                     SYNC DATA
@@ -123,7 +123,7 @@ const NexusMap: React.FC = () => {
                             <p className="font-mono text-gray-500 dark:text-[#8a8a8a] text-[10px] uppercase tracking-widest mb-1">[ DEPARTMENT.LOAD ]</p>
                             <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Department Breakdown</h2>
                         </div>
-                        <span className="text-gray-500 dark:text-[#8a8a8a] border border-[#333333] px-3 py-1 text-[10px] font-mono uppercase tracking-widest">{data.departmentBreakdown.length} DEPARTMENTS</span>
+                        <span className="text-gray-500 dark:text-[#8a8a8a] border border-gray-300 dark:border-[#333333] px-3 py-1 text-[10px] font-mono uppercase tracking-widest">{data.departmentBreakdown.length} DEPARTMENTS</span>
                     </div>
                     <div className="space-y-4">
                         {data.departmentBreakdown.length > 0 ? data.departmentBreakdown.map((department) => (
@@ -151,7 +151,7 @@ const NexusMap: React.FC = () => {
                             <p className="font-mono text-gray-500 dark:text-[#8a8a8a] text-[10px] uppercase tracking-widest mb-1">[ PROJECT.PIPELINE ]</p>
                             <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Live Projects</h2>
                         </div>
-                        <span className="text-gray-500 dark:text-[#8a8a8a] border border-[#333333] px-3 py-1 text-[10px] font-mono uppercase tracking-widest">{projects.length} TOTAL</span>
+                        <span className="text-gray-500 dark:text-[#8a8a8a] border border-gray-300 dark:border-[#333333] px-3 py-1 text-[10px] font-mono uppercase tracking-widest">{projects.length} TOTAL</span>
                     </div>
                     <div className="space-y-4">
                         {projects.length > 0 ? projects.slice(0, 6).map((project) => (
@@ -163,7 +163,7 @@ const NexusMap: React.FC = () => {
                                             {project.start_date ? `START ${new Date(project.start_date).toLocaleDateString()}` : 'START TBD'}
                                         </p>
                                     </div>
-                                    <span className="text-[10px] font-mono uppercase tracking-widest border border-[#333333] px-3 py-1 text-gray-500 dark:text-[#8a8a8a]">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest border border-gray-300 dark:border-[#333333] px-3 py-1 text-gray-500 dark:text-[#8a8a8a]">
                                         {project.status || 'planned'}
                                     </span>
                                 </div>
@@ -200,7 +200,7 @@ const NexusMap: React.FC = () => {
                             <div key={i} className="bg-white/50 dark:bg-black/50 backdrop-blur-md border border-gray-200 dark:border-white/10 p-5 flex flex-col hover:border-[#444] transition-colors relative">
                                 <div className="absolute top-5 right-5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }}></div>
                                 
-                                <div className="w-12 h-12 bg-transparent text-gray-900 dark:text-white flex items-center justify-center text-lg font-mono font-bold mb-4 border border-[#333333]">
+                                <div className="w-12 h-12 bg-transparent text-gray-900 dark:text-white flex items-center justify-center text-lg font-mono font-bold mb-4 border border-gray-300 dark:border-[#333333]">
                                     {initials}
                                 </div>
                                 

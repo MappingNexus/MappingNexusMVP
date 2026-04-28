@@ -131,7 +131,7 @@ const HRProjects: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-[1.2fr,0.8fr] gap-6">
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight mb-4">{editingId ? 'Edit Project' : 'Create Project'}</h2>
                     <form onSubmit={submit} className="space-y-4">
                         <input value={form.projectName} onChange={e => setForm({ ...form, projectName: e.target.value })} placeholder="Project name" className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors" />
@@ -187,7 +187,7 @@ const HRProjects: React.FC = () => {
                             <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">➔ No projects created yet.</p>
                         </div>
                     ) : projects.map(project => (
-                        <button key={project.project_id} onClick={() => startEditing(project)} className="w-full text-left bg-[#111111] border border-gray-200 dark:border-white/10 p-5 hover:border-blue-500 dark:border-[#00FF66]/30 transition-colors">
+                        <button key={project.project_id} onClick={() => startEditing(project)} className="w-full text-left bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-5 hover:border-blue-500 dark:hover:border-[#00FF66]/30 transition-colors">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
                                     <h3 className="text-gray-900 dark:text-white font-bold uppercase">{project.project_name}</h3>

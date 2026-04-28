@@ -146,7 +146,12 @@ router.post('/:provider/sync', requireAuth, requireRole('employee'), async (req:
 
         res.json({ success: true, ...result });
     } catch (error: any) {
-        res.status(400).json({ success: false, message: publicCalendarError(error) });
+        // Always log the real error server-side so it's visible in backend logs
+        console.error('[calendar/sync] Error syncing calendar:', error?.message || error);
+        const publicMessage = publicCalendarError(error);
+        // In development, surface the raw error message to the frontend for easier debugging
+        const devMessage = env.IS_DEV ? (error?.message || publicMessage) : publicMessage;
+        res.status(400).json({ success: false, message: devMessage });
     }
 });
 

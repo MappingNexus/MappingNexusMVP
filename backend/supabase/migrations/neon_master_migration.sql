@@ -236,6 +236,61 @@ CREATE TABLE IF NOT EXISTS public.burnout_signals (
 );
 
 -- ============================================================
+-- TABLE: employee_requests  (manager headcount requests)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.employee_requests (
+    request_id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id           uuid NOT NULL REFERENCES public.companies(company_id) ON DELETE CASCADE,
+    manager_id           uuid NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
+    requested_role       text NOT NULL,
+    skills_required      jsonb NOT NULL DEFAULT '[]'::jsonb,
+    priority             text NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    status               text NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Denied')),
+    viewed_at            timestamptz,
+    reviewed_at          timestamptz,
+    reviewed_by          uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
+    review_note          text,
+    created_employee_id  uuid REFERENCES public.employees(employee_id) ON DELETE SET NULL,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+    updated_at           timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============================================================
+-- TABLE: availability_window  (employee blocked-time windows)
+-- Includes calendar sync columns (source, source_provider, etc.)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.availability_window (
+    availability_window_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    employee_id            uuid NOT NULL REFERENCES public.employees(employee_id) ON DELETE CASCADE,
+    company_id             uuid NOT NULL REFERENCES public.companies(company_id) ON DELETE CASCADE,
+    window_type            text NOT NULL CHECK (window_type IN ('holiday', 'project_commitment', 'personal', 'other')),
+    start_date             date NOT NULL,
+    end_date               date NOT NULL,
+    note                   text,
+    created_by             uuid REFERENCES public.users(user_id) ON DELETE SET NULL,
+    created_at             timestamptz NOT NULL DEFAULT now(),
+    updated_at             timestamptz NOT NULL DEFAULT now(),
+    source                 text NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'calendar')),
+    source_provider        text CHECK (source_provider IN ('google', 'outlook') OR source_provider IS NULL),
+    source_event_id        text,
+    sync_run_id            uuid,
+    CHECK (start_date <= end_date)
+);
+
+-- ============================================================
+-- Calendar OAuth columns on employees  (migration 016)
+-- ============================================================
+ALTER TABLE public.employees
+    ADD COLUMN IF NOT EXISTS google_refresh_token_encrypted   text,
+    ADD COLUMN IF NOT EXISTS outlook_refresh_token_encrypted  text,
+    ADD COLUMN IF NOT EXISTS google_calendar_connected_at     timestamptz,
+    ADD COLUMN IF NOT EXISTS outlook_calendar_connected_at    timestamptz,
+    ADD COLUMN IF NOT EXISTS google_calendar_last_synced_at   timestamptz,
+    ADD COLUMN IF NOT EXISTS outlook_calendar_last_synced_at  timestamptz,
+    ADD COLUMN IF NOT EXISTS google_calendar_last_sync_error  text,
+    ADD COLUMN IF NOT EXISTS outlook_calendar_last_sync_error text;
+
+-- ============================================================
 -- TABLE: company_deks (encryption key storage)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.company_deks (
@@ -391,6 +446,21 @@ CREATE INDEX IF NOT EXISTS idx_burnout_employee_id ON public.burnout_signals(emp
 CREATE INDEX IF NOT EXISTS idx_burnout_company_id  ON public.burnout_signals(company_id);
 CREATE INDEX IF NOT EXISTS idx_burnout_risk_tier   ON public.burnout_signals(company_id, risk_tier);
 CREATE INDEX IF NOT EXISTS idx_burnout_detected_at ON public.burnout_signals(company_id, detected_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_employee_requests_company_status
+    ON public.employee_requests(company_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_employee_requests_manager
+    ON public.employee_requests(manager_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_availability_window_employee
+    ON public.availability_window(employee_id, start_date);
+CREATE INDEX IF NOT EXISTS idx_availability_window_company
+    ON public.availability_window(company_id, start_date);
+CREATE INDEX IF NOT EXISTS idx_availability_window_calendar_sync
+    ON public.availability_window(employee_id, company_id, source, source_provider, end_date);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_availability_window_calendar_event
+    ON public.availability_window(employee_id, source_provider, source_event_id)
+    WHERE source = 'calendar' AND source_provider IS NOT NULL AND source_event_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_company    ON public.telemetry_events(company_id);
 CREATE INDEX IF NOT EXISTS idx_telemetry_event_type ON public.telemetry_events(event_type);
