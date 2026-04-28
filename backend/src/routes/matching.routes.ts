@@ -85,6 +85,8 @@ const matchSchema = z.object({
         seniorityLevel: z.enum(['junior', 'mid', 'senior', 'lead', 'principal']).optional(),
         budgetCeiling: z.coerce.number().min(0).max(1000000).optional(),
         travelRequired: z.boolean().optional(),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     }),
 });
 
@@ -216,11 +218,18 @@ function calculateConfidence(
     const windows = emp.availabilityWindows || [];
     let conflictPenalty = 0;
     const thirtyDaysFromNow = now + 30 * 86400000;
+    const projectStart = requirements.startDate ? new Date(requirements.startDate).getTime() : now;
+    const projectEnd = requirements.endDate
+        ? new Date(requirements.endDate).getTime()
+        : (requirements.startDate ? projectStart + 30 * 86400000 : thirtyDaysFromNow);
+    const hasProjectDates = Boolean(requirements.startDate || requirements.endDate);
+    const conflictStart = hasProjectDates && Number.isFinite(projectStart) ? projectStart : now;
+    const conflictEnd = hasProjectDates && Number.isFinite(projectEnd) ? projectEnd : thirtyDaysFromNow;
     
     windows.forEach((w: any) => {
         const start = new Date(w.start_date).getTime();
-        const end = new Date(w.end_date).getTime();
-        if (start < thirtyDaysFromNow && end > now) {
+        const end = new Date(w.end_date).getTime() + 86400000 - 1;
+        if (start <= conflictEnd && end >= conflictStart) {
             conflictPenalty += (w.window_type === 'holiday' ? 30 : 15);
         }
     });
@@ -288,6 +297,17 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
             return res.status(400).json({
                 success: false,
                 message: 'At least one skill requirement is needed.',
+            });
+        }
+
+        if (
+            requirements.startDate &&
+            requirements.endDate &&
+            new Date(requirements.startDate) > new Date(requirements.endDate)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: 'Project start date must be before project end date.',
             });
         }
 
@@ -596,6 +616,8 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
                 requirements.seniorityLevel ? `Seniority: ${requirements.seniorityLevel}` : null,
                 requirements.budgetCeiling ? `Budget: ≤₹${requirements.budgetCeiling}/day` : null,
                 requirements.travelRequired ? 'Travel required' : null,
+                requirements.startDate ? `Project start: ${requirements.startDate}` : null,
+                requirements.endDate ? `Project end: ${requirements.endDate}` : null,
             ].filter(Boolean),
         });
     } catch (err: any) {
