@@ -66,4 +66,16 @@ export const env = {
 
     // Google OAuth
     GOOGLE_CLIENT_ID: optional('GOOGLE_CLIENT_ID', 'placeholder-google-client-id.apps.googleusercontent.com'),
+    GOOGLE_CLIENT_SECRET: optional('GOOGLE_CLIENT_SECRET', ''),
+    GOOGLE_CALENDAR_REDIRECT_URI: optional('GOOGLE_CALENDAR_REDIRECT_URI', ''),
+
+    // Microsoft OAuth / Outlook Calendar
+    MICROSOFT_CLIENT_ID: optional('MICROSOFT_CLIENT_ID', ''),
+    MICROSOFT_CLIENT_SECRET: optional('MICROSOFT_CLIENT_SECRET', ''),
+    MICROSOFT_CALENDAR_REDIRECT_URI: optional('MICROSOFT_CALENDAR_REDIRECT_URI', ''),
+    MICROSOFT_TENANT_ID: optional('MICROSOFT_TENANT_ID', 'common'),
+
+    // Calendar sync scheduler
+    CALENDAR_SYNC_CRON: optional('CALENDAR_SYNC_CRON', '15 2 * * *'),
+    CALENDAR_SYNC_TIMEZONE: optional('CALENDAR_SYNC_TIMEZONE', 'Asia/Kolkata'),
 } as const;

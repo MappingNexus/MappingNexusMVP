@@ -377,6 +377,42 @@ export async function archiveEmployee(id: string) {
     return request(`/api/employees/${id}`, { method: 'DELETE' });
 }
 
+// ============ Calendar Sync ============
+
+export type CalendarProvider = 'google' | 'outlook';
+
+export async function getCalendarStatus() {
+    return request<{
+        success: boolean;
+        status: Record<CalendarProvider, {
+            connected: boolean;
+            connectedAt: string | null;
+            lastSyncedAt: string | null;
+            lastSyncError: string | null;
+        }>;
+    }>('/api/calendar/status');
+}
+
+export async function getCalendarAuthUrl(provider: CalendarProvider) {
+    return request<{ success: boolean; authorizationUrl: string; message?: string }>(
+        `/api/calendar/${provider}/auth-url`
+    );
+}
+
+export async function syncCalendar(provider: CalendarProvider) {
+    return request<{ success: boolean; syncedWindows: number; message?: string }>(
+        `/api/calendar/${provider}/sync`,
+        { method: 'POST' }
+    );
+}
+
+export async function disconnectCalendar(provider: CalendarProvider) {
+    return request<{ success: boolean; message?: string }>(
+        `/api/calendar/${provider}`,
+        { method: 'DELETE' }
+    );
+}
+
 // ============ Teams ============
 
 export async function getTeams() {
@@ -460,6 +496,7 @@ export async function runMatch(requirements: {
     skills: { name: string; priority: 'Essential' | 'Preferred' }[];
     seniorityLevel?: string; budgetCeiling?: number;
     travelRequired?: boolean;
+    startDate?: string; endDate?: string;
 }, brief?: string) {
     return request<{
         success: boolean; matches: MatchResult[];

@@ -99,7 +99,7 @@ const EmployeeManagement: React.FC = () => {
             </div>
 
             {loading ? <LoadingSpinner /> :
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 overflow-hidden">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 overflow-hidden">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-gray-200 dark:border-white/10">
@@ -196,8 +196,8 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
 
     return (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-black/50 backdrop-blur-md w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <div className="bg-[#111111] flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-white/10">
+            <div className="border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111111] w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div className="bg-gray-50 dark:bg-[#0f0f0f] flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-white/10">
                     <div className="w-3 h-3 rounded-full bg-[#FF3333]"></div>
                     <div className="w-3 h-3 rounded-full bg-[#FF9900]"></div>
                     <div className="w-3 h-3 rounded-full bg-[#00FF66]"></div>
@@ -366,8 +366,8 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
 
     return (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-black/50 backdrop-blur-md w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <div className="bg-[#111111] flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-white/10">
+            <div className="border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111111] w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="bg-gray-50 dark:bg-[#0f0f0f] flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-white/10">
                     <div className="w-3 h-3 rounded-full bg-[#FF3333]"></div>
                     <div className="w-3 h-3 rounded-full bg-[#FF9900]"></div>
                     <div className="w-3 h-3 rounded-full bg-[#00FF66]"></div>

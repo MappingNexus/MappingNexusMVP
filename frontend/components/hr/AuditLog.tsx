@@ -54,7 +54,7 @@ const AuditLog: React.FC = () => {
             </div>
 
             {loading ? <LoadingSpinner /> : (
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 overflow-hidden">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 overflow-hidden">
                     <table className="w-full">
                         <thead><tr className="border-b border-gray-200 dark:border-white/10">
                             {['Time', 'Action', 'Actor Role', 'Target', 'Details'].map(h => (

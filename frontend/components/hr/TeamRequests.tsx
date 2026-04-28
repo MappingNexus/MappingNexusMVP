@@ -84,7 +84,7 @@ const TeamRequests: React.FC = () => {
                         <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">➔ No manager staffing requests in the queue.</p>
                     </div>
                 ) : staffingQueue.map(request => (
-                    <div key={request.requestId} className="border border-gray-200 dark:border-white/10 bg-[#111111] p-5">
+                    <div key={request.requestId} className="border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0f0f0f] p-5">
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="flex-1">
                                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -129,7 +129,7 @@ const TeamRequests: React.FC = () => {
                 ) : (
                     <div className="space-y-3">
                         {membershipRequests.map(req => (
-                            <div key={req.membershipId} className="border border-gray-200 dark:border-white/10 bg-[#111111] p-5">
+                            <div key={req.membershipId} className="border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0f0f0f] p-5">
                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                     <div className="flex-1">
                                         <div className="mb-2 flex items-center gap-2">

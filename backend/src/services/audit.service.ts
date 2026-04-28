@@ -159,6 +159,7 @@ function sanitizeMetadata(meta: Record<string, any>): Record<string, any> {
         'endpoint', 'severity', 'method', 'requiredRoles', 'attemptedEndpoint',
         'attemptedCompanyId',
         'priority', 'requestedRole', 'fieldsUpdated',
+        'provider',
     ]);
 
     const sanitized: Record<string, any> = {};

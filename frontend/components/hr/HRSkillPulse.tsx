@@ -48,7 +48,7 @@ const HRSkillPulse: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Top Skills */}
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">Top Skills ({data.topSkills.length})</h3>
                     {data.topSkills.map((s, i) => (
                         <div key={i} className="mb-4">
@@ -67,7 +67,7 @@ const HRSkillPulse: React.FC = () => {
                 <div className="space-y-3">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase">Trending Skills</h3>
                     {data.trendingSkills.map((s, i) => (
-                        <div key={i} className="bg-[#111111] border border-gray-200 dark:border-white/10 p-5 flex justify-between items-center">
+                        <div key={i} className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-5 flex justify-between items-center">
                             <span className="text-gray-900 dark:text-white font-medium">{s.name}</span>
                             <span className="text-blue-500 dark:text-[#00FF66] font-mono text-sm">{s.growthPercent}</span>
                         </div>
@@ -80,7 +80,7 @@ const HRSkillPulse: React.FC = () => {
                 </div>
 
                 {/* Dormant Skills */}
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">
                         Dormant Skills <span className="text-[10px] text-gray-500 dark:text-[#8a8a8a] font-mono normal-case tracking-normal">(unused &gt; 90 days)</span>
                     </h3>
@@ -101,7 +101,7 @@ const HRSkillPulse: React.FC = () => {
                 </div>
 
                 {/* Skill Gaps */}
-                <div className="bg-[#111111] border border-gray-200 dark:border-white/10 p-6">
+                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">Skill Gaps</h3>
                     {data.skillGaps.map((g, i) => (
                         <div key={i} className="mb-4">

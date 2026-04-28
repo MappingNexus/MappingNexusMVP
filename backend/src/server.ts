@@ -34,7 +34,8 @@ import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { verifyDatabaseConnection } from './config/db.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
-import './workers/embedding.worker.js';
+// import './workers/embedding.worker.js'; // Disabled to prevent Redis connection spam
+import { startCalendarSyncScheduler } from './workers/calendar-sync.scheduler.js';
 
 // Route imports
 import authRoutes from './routes/auth.routes.js';
@@ -49,6 +50,7 @@ import projectRoutes from './routes/projects.routes.js';
 import assignmentRoutes from './routes/assignments.routes.js';
 import bulkImportRoutes from './routes/bulk-import.routes.js';
 import requestRoutes from './routes/requests.routes.js';
+import calendarRoutes from './routes/calendar.routes.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -106,6 +108,7 @@ app.use('/api/telemetry', telemetryRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/requests', requestRoutes);
+app.use('/api/calendar', calendarRoutes);
 
 // ============================================================
 // HEALTH CHECK
@@ -161,6 +164,7 @@ if (!process.env.VERCEL) {
         console.log(`  Env:        ${env.NODE_ENV}`);
 
         const dbOk = await verifyDatabaseConnection();
+        startCalendarSyncScheduler();
         console.log(`  Neon DB:    ${dbOk ? '✅ Connected' : '❌ NOT CONNECTED'}`);
         console.log(`  OpenRouter: ${env.OPENROUTER_API_KEY && !env.OPENROUTER_API_KEY.includes('placeholder') ? '✅ Configured' : '❌ Missing'}`);
         console.log(`  Encryption: ${env.ENCRYPTION_KEK ? '✅ KEK loaded' : '❌ Missing'}`);

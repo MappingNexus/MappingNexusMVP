@@ -31,6 +31,8 @@ export interface AvailabilityWindow {
     startDate: string;
     endDate: string;
     note?: string;
+    source?: 'manual' | 'calendar';
+    sourceProvider?: 'google' | 'outlook' | null;
 }
 
 export interface Employee {
