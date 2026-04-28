@@ -52,7 +52,7 @@ export interface Employee {
     lastAssignmentDate?: string;
     performanceScore?: number;
     costPerDay?: number;
-    costRange?: string;
+    costRange?: 'below average' | 'near average' | 'above average' | null;
     tenureYears: number;
     isArchived: boolean;
     skills: Skill[];
@@ -93,11 +93,12 @@ export interface MembershipRequest {
 }
 
 export interface ROIEstimate {
-    candidateCostPerDay: number;
-    companyAvgCostPerDay: number;
-    savingsPerDay: number;
-    savingsPercent: number;
-    projected90DaySavings: number;
+    costBand?: 'below average' | 'near average' | 'above average' | null;
+    candidateCostPerDay?: number;
+    companyAvgCostPerDay?: number;
+    savingsPerDay?: number;
+    savingsPercent?: number;
+    projected90DaySavings?: number;
 }
 
 export interface MatchResult {
@@ -189,6 +190,27 @@ export interface AnalyticsOverview {
     mobilityRate: number;
     departmentBreakdown: DepartmentBreakdown[];
     utilizationHeatmap: UtilizationEntry[];
+    projectReadiness: ProjectReadinessSummary;
+}
+
+export interface ProjectReadinessSummary {
+    status: 'ready' | 'watch' | 'gap';
+    upcomingProjects: number;
+    readyProjects: number;
+    projectsAtRisk: number;
+    requiredSkillSlots: number;
+    coveredSkillSlots: number;
+    coveragePct: number;
+    availablePeople: number;
+    blockedPeople: number;
+    biggestGaps: {
+        projectName: string;
+        skillName: string;
+        demand: number;
+        available: number;
+        gap: number;
+        startDate: string | null;
+    }[];
 }
 
 export interface DepartmentBreakdown {

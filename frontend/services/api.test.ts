@@ -71,7 +71,7 @@ test('getErrorMessage returns the API message when present', () => {
     assert.equal(api.getErrorMessage({ success: false }, 'Fallback'), 'Fallback');
 });
 
-test('login stores the session, user, and company secret on success', async () => {
+test('login stores the session and user on success', async () => {
     (globalThis as any).fetch = async (_url: string, init?: RequestInit) => {
         assert.equal(init?.method, 'POST');
         assert.match(String(init?.body), /"email":"hr@example.com"/);
@@ -86,11 +86,10 @@ test('login stores the session, user, and company secret on success', async () =
         });
     };
 
-    const result = await api.login('hr@example.com', 'password', 'company-secret');
+    const result = await api.login('hr@example.com', 'password');
 
     assert.equal(result.success, true);
     assert.equal(api.getToken(), 'access-token');
-    assert.equal(api.getCompanySecret(), 'company-secret');
     assert.deepEqual(api.getUser(), user);
 });
 

@@ -27,7 +27,7 @@ import {
     getInviteEmailFailureMessage,
     getInviteEmailSentMessage,
 } from '../services/password-reset.service.js';
-import { requireCompanySecret, getCompanySecret } from '../utils/company-secret.js';
+import { getCompanySecret } from '../utils/company-secret.js';
 import { validate } from '../utils/validation.js';
 
 const router = Router();
@@ -137,6 +137,55 @@ async function getManagerVisibleEmployeeIds(
     return (data || []).map((membership: any) => membership.employee_id);
 }
 
+type ManagerCostBand = 'below average' | 'near average' | 'above average';
+
+async function getCompanyAverageCost(
+    db: any,
+    companyId: string,
+    companySecret?: string
+): Promise<number | null> {
+    const { data: employees, error } = await db
+        .from('employees')
+        .select('cost_per_day_encrypted')
+        .eq('company_id', companyId)
+        .eq('is_archived', false)
+        .not('cost_per_day_encrypted', 'is', null);
+
+    if (error || !employees?.length) {
+        return null;
+    }
+
+    const decryptedCosts = await Promise.all(
+        employees.map(async (employee: { cost_per_day_encrypted: string | null }) => {
+            try {
+                if (!employee.cost_per_day_encrypted) return null;
+                const value = parseFloat(await decrypt(employee.cost_per_day_encrypted, companyId, companySecret));
+                return Number.isFinite(value) && value > 0 ? value : null;
+            } catch {
+                return null;
+            }
+        })
+    );
+
+    const validCosts = decryptedCosts.filter((cost): cost is number => cost !== null);
+    if (!validCosts.length) {
+        return null;
+    }
+
+    return validCosts.reduce((sum, cost) => sum + cost, 0) / validCosts.length;
+}
+
+function getManagerCostBand(cost: number | null, averageCost: number | null): ManagerCostBand | null {
+    if (cost == null || averageCost == null || averageCost <= 0) {
+        return null;
+    }
+
+    const ratio = cost / averageCost;
+    if (ratio < 0.9) return 'below average';
+    if (ratio > 1.1) return 'above average';
+    return 'near average';
+}
+
 /**
  * Generate a secure temporary password.
  */
@@ -208,7 +257,8 @@ async function formatEmployeeResponse(
     emp: any,
     companyId: string,
     viewerRole: string,
-    companySecret?: string
+    companySecret?: string,
+    companyAvgCost?: number | null
 ) {
     const decrypted = await decryptFields({
         name: emp.name_encrypted,
@@ -279,6 +329,12 @@ async function formatEmployeeResponse(
         response.performanceScore = decrypted.performanceScore ? parseFloat(decrypted.performanceScore) : null;
     }
 
+    if (viewerRole === 'manager') {
+        const cost = decrypted.costPerDay ? parseFloat(decrypted.costPerDay) : null;
+        response.costRange = getManagerCostBand(cost, companyAvgCost ?? null);
+        delete response.performanceScore;
+    }
+
     return response;
 }
 
@@ -290,7 +346,6 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
     try {
         const user = (req as AuthenticatedRequest).user;
         const db = supabaseAdmin;
-        const companySecret = requireCompanySecret(req);
         const {
             name, workEmail, department, seniorityLevel, costPerDay,
             location, travelEligible, skills, performanceScore,
@@ -389,7 +444,7 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
             work_email_encrypted: workEmail,
             cost_per_day_encrypted: costPerDay ?? null,
             performance_score_encrypted: performanceScore ?? null,
-        }, user.companyId, companySecret);
+        }, user.companyId);
 
         // 4. Insert employee record
         const { data: employee, error: empError } = await db
@@ -579,6 +634,9 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
         const companySecret = getCompanySecret(req);
         const { department, seniority, archived } = req.query;
         const includeArchived = archived === 'true' && user.role === 'hr';
+        const managerAvgCost = user.role === 'manager'
+            ? await getCompanyAverageCost(db, user.companyId, companySecret)
+            : null;
 
         let query = db
             .from('employees')
@@ -618,7 +676,14 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 
         // Decrypt and format all employees
         const formatted = await Promise.all(
-            (employees || []).map(emp => formatEmployeeResponse(db, emp, user.companyId, user.role, companySecret))
+            (employees || []).map(emp => formatEmployeeResponse(
+                db,
+                emp,
+                user.companyId,
+                user.role,
+                companySecret,
+                managerAvgCost
+            ))
         );
 
         res.json({
@@ -642,6 +707,9 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
         const db = supabaseAdmin;
         const companySecret = getCompanySecret(req);
         const { id } = req.params;
+        const managerAvgCost = user.role === 'manager'
+            ? await getCompanyAverageCost(db, user.companyId, companySecret)
+            : null;
 
         if (user.role === 'manager') {
             const visibleEmployeeIds = await getManagerVisibleEmployeeIds(db, user.companyId, user.userId);
@@ -666,7 +734,14 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, message: 'Employee not found.' });
         }
 
-        const formatted = await formatEmployeeResponse(db, emp, user.companyId, user.role, companySecret);
+        const formatted = await formatEmployeeResponse(
+            db,
+            emp,
+            user.companyId,
+            user.role,
+            companySecret,
+            managerAvgCost
+        );
         res.json({ success: true, employee: formatted });
     } catch (err: any) {
         console.error('Get employee error:', err.message);
@@ -758,21 +833,14 @@ router.put('/:id', requireAuth, requireRole('hr', 'employee'), validate(updateEm
                 message: 'Only HR can update protected employee fields.',
             });
         }
-        if (isUpdatingProtectedFields && !companySecret) {
-            return res.status(400).json({
-                success: false,
-                message: 'Company secret is required when updating protected employee fields.',
-            });
-        }
-
         // HR can update everything
         if (user.role === 'hr') {
-            if (name) updates.name_encrypted = await encrypt(name, user.companyId, companySecret);
-            if (workEmail) updates.work_email_encrypted = await encrypt(workEmail, user.companyId, companySecret);
+            if (name) updates.name_encrypted = await encrypt(name, user.companyId);
+            if (workEmail) updates.work_email_encrypted = await encrypt(workEmail, user.companyId);
             if (department) updates.department = department;
             if (seniorityLevel) updates.seniority_level = seniorityLevel;
-            if (costPerDay !== undefined) updates.cost_per_day_encrypted = await encrypt(String(costPerDay), user.companyId, companySecret);
-            if (performanceScore !== undefined) updates.performance_score_encrypted = await encrypt(String(performanceScore), user.companyId, companySecret);
+            if (costPerDay !== undefined) updates.cost_per_day_encrypted = await encrypt(String(costPerDay), user.companyId);
+            if (performanceScore !== undefined) updates.performance_score_encrypted = await encrypt(String(performanceScore), user.companyId);
             if (tenureYears !== undefined) updates.tenure_years = tenureYears;
             if (currentProjectLoad !== undefined) updates.current_project_load = currentProjectLoad;
         }
