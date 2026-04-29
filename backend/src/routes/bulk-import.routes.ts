@@ -215,7 +215,10 @@ router.post('/', requireAuth, requireRole('hr'), async (req: Request, res: Respo
                     .single();
 
                 if (empError) {
-                    await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+                    const rollbackResult = await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+                    if (rollbackResult.error) {
+                        console.error('Bulk import rollback failed:', rollbackResult.error.message);
+                    }
                     results.push({ row: i + 2, email, status: 'failed', error: (empError as any).message });
                     continue;
                 }

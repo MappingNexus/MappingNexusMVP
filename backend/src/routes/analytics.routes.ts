@@ -21,6 +21,7 @@ const BURNOUT_LOAD_PER_PROJECT = 18;
 const BURNOUT_CAPACITY_RISK_MAX = 28;
 const PROJECT_READINESS_DAYS = 60;
 const PROJECT_READINESS_AVAILABILITY_LOAD_LIMIT = 3;
+type BurnoutSignalType = 'overtime_proxy' | 'consecutive_assignments' | 'no_leave';
 
 function getEmptyBurnoutData() {
     return {
@@ -295,7 +296,7 @@ router.get('/overview', requireAuth, requireRole('hr', 'manager'), async (req: R
             (allSkills || [])
                 .filter(s => {
                     if (!s.last_used_date) return false;
-                    return Math.floor((now - new Date(s.last_used_date).getTime()) / MS_PER_DAY) > 90;
+                    return Math.floor((now - new Date(s.last_used_date).getTime()) / MS_PER_DAY) >= 90;
                 })
                 .map(s => s.employee_id)
         ).size;
@@ -402,6 +403,7 @@ router.get('/burnout', requireAuth, requireRole('hr', 'manager'), async (req: Re
         const { data: recentAssignments } = await db
             .from('assignments')
             .select('employee_id, start_date')
+            .eq('company_id', user.companyId)
             .in('employee_id', visibleIds)
             .gte('start_date', ninetyDaysAgo);
         const velocityMap = (recentAssignments || []).reduce((acc, assignment) => {
@@ -443,6 +445,18 @@ router.get('/burnout', requireAuth, requireRole('hr', 'manager'), async (req: Re
             const velocityScore = Math.min(100, velocity.last90 * 18 + velocity.last30 * 14);
             let riskScore = Math.round(loadScore * 0.45 + tenureRiskScore * 0.2 + velocityScore * 0.35);
             riskScore = Math.min(100, riskScore);
+            
+            // Determine dominant burnout sub-score to derive signal_type
+            const dominantScore = Math.max(loadScore, tenureRiskScore, velocityScore);
+            let dominantSignalType: BurnoutSignalType = 'overtime_proxy';
+            if (dominantScore === loadScore) {
+                dominantSignalType = 'overtime_proxy';
+            } else if (dominantScore === velocityScore) {
+                dominantSignalType = 'consecutive_assignments';
+            } else if (dominantScore === tenureRiskScore) {
+                dominantSignalType = 'no_leave';
+            }
+            
             const signals: string[] = [];
             if (loadScore >= 65) signals.push(`Project load pressure: ${e.current_project_load} active projects at ${Math.round(Number(e.capacity_committed_pct || 0))}% capacity`);
             if (velocityScore >= 55) signals.push(`Recent velocity spike: ${velocity.last30} starts in 30d / ${velocity.last90} in 90d`);
@@ -451,7 +465,7 @@ router.get('/burnout', requireAuth, requireRole('hr', 'manager'), async (req: Re
             const recommendation = riskScore >= 70
                 ? 'Immediate workload reduction or leave recommended'
                 : riskScore >= 40 ? 'Monitor closely, consider redistribution' : 'Current workload looks sustainable';
-            return { id: e.employee_id, name, department: e.department, riskScore, riskTier, signals, recommendation };
+            return { id: e.employee_id, name, department: e.department, riskScore, riskTier, signals, recommendation, dominantSignalType };
         });
 
         // Persist high-risk signals to burnout_signals table (deduplicated per day)
@@ -460,7 +474,7 @@ router.get('/burnout', requireAuth, requireRole('hr', 'manager'), async (req: Re
             .map(s => ({
                 employee_id: s.id,
                 company_id: user.companyId,
-                signal_type: 'task_velocity' as const,
+                signal_type: s.dominantSignalType,
                 risk_tier: s.riskScore >= 70 ? 'high' as const : 'medium' as const,
                 details: { riskScore: s.riskScore, signals: s.signals },
             }));

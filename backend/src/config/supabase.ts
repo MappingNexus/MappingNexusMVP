@@ -312,6 +312,51 @@ class SupabaseQueryBuilder {
 // Shim Client — matches Supabase client shape used by routes
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function deleteAuthUser(userId: string) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const existingUser = await client.query(
+            'SELECT user_id FROM public.users WHERE user_id = $1 FOR UPDATE',
+            [userId]
+        );
+        if (existingUser.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return { error: { message: 'User not found', code: 'PGRST116' } };
+        }
+
+        await client.query(
+            'DELETE FROM public.team_memberships WHERE requested_by = $1 OR reviewed_by = $1',
+            [userId]
+        );
+        await client.query(
+            'DELETE FROM public.assignments WHERE assigned_by = $1',
+            [userId]
+        );
+        await client.query(
+            'DELETE FROM public.teams WHERE manager_id = $1',
+            [userId]
+        );
+        await client.query(
+            'DELETE FROM public.users WHERE user_id = $1',
+            [userId]
+        );
+
+        await client.query('COMMIT');
+        return { error: null };
+    } catch (err: any) {
+        try {
+            await client.query('ROLLBACK');
+        } catch {
+            // Ignore rollback errors and surface the original failure.
+        }
+        return { error: { message: err.message } };
+    } finally {
+        client.release();
+    }
+}
+
 class SupabaseShimClient {
     from(table: string) {
         return new SupabaseQueryBuilder(table);
@@ -362,7 +407,44 @@ class SupabaseShimClient {
                     error: null,
                 };
             },
-            deleteUser: async (_userId: string) => ({ error: null }),
+            deleteUser: async (userId: string) => deleteAuthUser(userId),
+                    // Step 1: Delete team_memberships where this user requested or reviewed
+                    // (no constraint violation since team_memberships.requested_by and reviewed_by
+                    // don't have explicit ON DELETE constraints)
+                    // await pool.query(
+                    //     'DELETE FROM public.team_memberships WHERE requested_by = $1 OR reviewed_by = $1',
+                    //     [userId]
+                    // );
+
+                    // Step 2: Delete assignments where this user is the assigned_by manager
+                    // (assignments.assigned_by references users.user_id with no explicit constraint)
+                    // await pool.query(
+                    //     'DELETE FROM public.assignments WHERE assigned_by = $1',
+                    //     [userId]
+                    // );
+
+                    // Step 3: Delete teams where this user is the manager
+                    // (teams.manager_id has ON DELETE RESTRICT, so we must delete teams first)
+                    // await pool.query(
+                    //     'DELETE FROM public.teams WHERE manager_id = $1',
+                    //     [userId]
+                    // );
+
+                    // Step 4: Delete the user from public.users
+                    // Cascading effects:
+                    // - refresh_token_sessions.user_id (ON DELETE CASCADE) → auto-deleted
+                    // - employees.user_id (ON DELETE SET NULL) → set to NULL
+                    // - skills (via employees.employee_id ON DELETE CASCADE) → auto-deleted
+                    // - burnout_signals (via employees.employee_id ON DELETE CASCADE) → auto-deleted
+                    // await pool.query(
+                    //     'DELETE FROM public.users WHERE user_id = $1',
+                    //     [userId]
+                    // );
+
+                    // return { error: null };
+                // } catch (err: any) {
+                    // return { error: { message: err.message } };
+                // }
             getUserById: async (userId: string) => {
                 const result = await pool.query(
                     'SELECT user_id, email FROM public.users WHERE user_id = $1',

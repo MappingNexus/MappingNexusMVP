@@ -42,10 +42,12 @@ router.post('/', requireAuth, validate(telemetrySchema), async (req: Request, re
 
 router.get('/', requireAuth, requireRole('hr'), async (req: Request, res: Response) => {
     try {
+        const user = (req as AuthenticatedRequest).user;
         const db = supabaseAdmin;
         const { data, error } = await db
             .from('telemetry_events')
             .select('*')
+            .eq('company_id', user.companyId)
             .order('created_at', { ascending: false })
             .limit(100);
 

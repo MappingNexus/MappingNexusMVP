@@ -209,7 +209,7 @@ function calculateConfidence(
                 const daysSince = Math.floor(
                     (now - new Date(match.last_used_date).getTime()) / 86400000
                 );
-                if (daysSince > 90) base *= 0.7;
+                if (daysSince >= 90) base *= 0.7;
                 else if (daysSince < 30) base *= 1.1;
             }
 
@@ -569,7 +569,7 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
 
         // Sort by confidence
         candidateProfiles.sort((a, b) => b.confidenceScore - a.confidenceScore);
-        const topCandidates = candidateProfiles.slice(0, 10);
+        const topCandidates = candidateProfiles.slice(0, 5);
 
         // ============================================================
         // STEP 4: LangChain Retrieval QA for AI explanations

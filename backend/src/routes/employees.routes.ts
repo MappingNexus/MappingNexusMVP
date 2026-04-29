@@ -469,7 +469,10 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
 
         if (empError) {
             // Rollback: delete the auth account we created
-            await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+            const rollbackResult = await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+            if (rollbackResult.error) {
+                console.error('Employee create rollback failed:', rollbackResult.error.message);
+            }
             return res.status(500).json({
                 success: false,
                 message: `Failed to create employee record: ${(empError as any).message}`,
@@ -481,7 +484,10 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
             const skillValidation = validateAndNormalizeSkills(skills);
             if (!skillValidation.valid || !skillValidation.normalizedSkills) {
                 await db.from('employees').delete().eq('employee_id', employee.employee_id).eq('company_id', user.companyId);
-                await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+                const rollbackResult = await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+                if (rollbackResult.error) {
+                    console.error('Employee skill validation rollback failed:', rollbackResult.error.message);
+                }
                 return res.status(400).json({
                     success: false,
                     message: skillValidation.message || 'Invalid skills payload.',

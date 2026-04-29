@@ -100,7 +100,7 @@ router.post('/', requireAuth, requireRole('hr', 'manager'), async (req: Request,
         // Verify project belongs to the same company
         const { data: project, error: projError } = await supabaseAdmin
             .from('projects')
-            .select('project_id, company_id')
+            .select('project_id, company_id, required_skills')
             .eq('project_id', projectId)
             .eq('company_id', user.companyId)
             .single();
@@ -144,6 +144,44 @@ router.post('/', requireAuth, requireRole('hr', 'manager'), async (req: Request,
 
         if (insertError) {
             return res.status(500).json({ success: false, message: insertError.message });
+        }
+
+        // Update skills' last_used_date for skills involved in this assignment
+        // Get the project's required skills and update matching employee skills
+        if (project.required_skills && Array.isArray(project.required_skills) && project.required_skills.length > 0) {
+            try {
+                const requiredSkillNames = project.required_skills
+                    .map((s: any) => s?.skill_name)
+                    .filter((skillName: unknown): skillName is string => typeof skillName === 'string' && skillName.length > 0);
+
+                if (requiredSkillNames.length > 0) {
+                    // Get the employee's skills that match the project's required skills
+                    const { data: employeeSkills, error: employeeSkillsError } = await supabaseAdmin
+                        .from('skills')
+                        .select('skill_id')
+                        .eq('employee_id', employeeId)
+                        .eq('company_id', user.companyId)
+                        .in('skill_name', requiredSkillNames);
+
+                    if (employeeSkillsError) {
+                        console.warn('Assignment skill sync lookup failed:', employeeSkillsError.message);
+                    } else if (employeeSkills && employeeSkills.length > 0) {
+                        const skillIds = employeeSkills.map((s: any) => s.skill_id);
+                        const today = new Date().toISOString().split('T')[0];
+                        const { error: skillUpdateError } = await supabaseAdmin
+                            .from('skills')
+                            .update({ last_used_date: today })
+                            .in('skill_id', skillIds)
+                            .eq('company_id', user.companyId);
+
+                        if (skillUpdateError) {
+                            console.warn('Assignment skill sync update failed:', skillUpdateError.message);
+                        }
+                    }
+                }
+            } catch (skillSyncError: any) {
+                console.warn('Assignment skill sync skipped:', skillSyncError.message);
+            }
         }
 
         // Audit log
