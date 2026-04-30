@@ -32,37 +32,37 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
     ];
 
     return (
-        <div className={`min-h-screen flex flex-col font-sans transition-colors duration-500 relative overflow-hidden ${isDark ? 'bg-[#0a0a0c] text-white selection:bg-[#00FF66]/30' : 'bg-[#FAFAFA] text-gray-900 selection:bg-blue-500/30'}`}>
+        <div className="min-h-screen flex flex-col font-sans transition-colors duration-500 relative overflow-hidden bg-background text-foreground">
             <BackgroundEffects />
             
             {/* Top Navigation Bar */}
-            <header className="h-16 border-b border-gray-200/50 dark:border-white/10 bg-white/70 dark:bg-[#1a1a1c]/70 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50 transition-all duration-300">
+            <header className="h-16 border-b border-border/50 bg-card/70 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50 transition-all duration-300">
                 <div className="flex items-center gap-3">
                     <img src="/logo.svg" alt="Company Logo" className={`w-6 h-6 object-contain ${isDark ? '' : 'invert'}`} />
                     <div className="flex items-baseline gap-2">
                         <span className="font-bold tracking-widest text-sm uppercase">{user.companyName || 'MAPPING NEXUS'}</span>
-                        <span className="text-gray-500 dark:text-[#8A8A8A] text-[10px] font-mono tracking-widest uppercase">| platform</span>
+                        <span className="text-muted-foreground text-[10px] font-mono tracking-widest uppercase">| platform</span>
                     </div>
                 </div>
-                <div className="hidden md:flex items-center gap-2 text-gray-500 dark:text-[#8A8A8A] font-mono text-xs">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 dark:bg-[#00FF66] animate-pulse"></div>
+                <div className="hidden md:flex items-center gap-2 text-muted-foreground font-mono text-xs">
+                    <div className="w-2 h-2 rounded-full bg-nexus-green animate-pulse"></div>
                     <span>APP-LAYER TENANT CONTROLS ACTIVE</span>
                 </div>
                 <div className="flex items-center gap-4">
                     <button 
                         onClick={() => setIsDark(!isDark)} 
-                        className="p-1.5 border border-gray-200 dark:border-white/15 rounded-full text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                        className="p-1.5 border border-border rounded-full text-muted-foreground hover:bg-accent transition-colors"
                         aria-label="Toggle theme"
                     >
                         {isDark ? <Sun className="w-[18px] h-[18px]" strokeWidth={1.5} /> : <Moon className="w-[18px] h-[18px]" strokeWidth={1.5} />}
                     </button>
                     <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-sm bg-gray-100 dark:bg-[#1A1A1A] border border-gray-300 dark:border-[#2A2A2A] flex items-center justify-center text-[10px] font-bold">
+                        <div className="w-6 h-6 rounded-sm bg-secondary border border-border flex items-center justify-center text-[10px] font-bold">
                             {user.email ? user.email.substring(0, 2).toUpperCase() : 'PR'}
                         </div>
-                        <span className="hidden md:block text-gray-500 dark:text-[#8A8A8A] text-xs font-mono uppercase tracking-widest">{user.role}</span>
+                        <span className="hidden md:block text-muted-foreground text-xs font-mono uppercase tracking-widest">{user.role}</span>
                     </div>
-                    <button onClick={onLogout} title="Logout" className="text-gray-500 dark:text-[#8A8A8A] hover:text-red-500 dark:hover:text-[#FF3333] transition-colors ml-4 border-l border-gray-300 dark:border-[#2A2A2A] pl-4">
+                    <button onClick={onLogout} title="Logout" className="text-muted-foreground hover:text-destructive transition-colors ml-4 border-l border-border pl-4">
                         <LogOut className="w-4 h-4" />
                     </button>
                 </div>
@@ -70,10 +70,10 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
 
             <div className="flex flex-1 overflow-hidden relative z-10">
                 {/* Left Sidebar */}
-                <aside className="w-64 border-r border-gray-200/50 dark:border-white/10 bg-white/50 dark:bg-[#1a1a1c]/50 backdrop-blur-md hidden md:flex flex-col transition-all duration-300">
+                <aside className="w-64 border-r border-border/50 bg-sidebar/50 backdrop-blur-md hidden md:flex flex-col transition-all duration-300">
                     <div className="py-8 flex-1 flex flex-col overflow-y-auto">
                         <div className="px-6 mb-6">
-                            <span className="text-gray-400 dark:text-[#8A8A8A] font-mono text-[10px] tracking-widest uppercase">[ NAVIGATION ]</span>
+                            <span className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">[ NAVIGATION ]</span>
                         </div>
                         <nav className="flex flex-col space-y-1 px-4">
                             {navItems.map(item => (
@@ -83,8 +83,8 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
                                     className={({ isActive }) =>
                                         `flex items-center gap-3 px-4 py-2.5 text-xs font-mono uppercase tracking-widest transition-all duration-200 rounded-lg ${
                                             isActive
-                                                ? 'bg-blue-50/80 dark:bg-white/10 text-blue-600 dark:text-white font-bold border border-blue-200 dark:border-white/20 shadow-sm'
-                                                : 'border border-transparent text-gray-500 dark:text-[#8A8A8A] hover:text-gray-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#1A1A1A]/50'
+                                                ? 'bg-accent text-accent-foreground font-bold border border-border shadow-sm'
+                                                : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-accent'
                                         }`
                                     }
                                 >
@@ -93,18 +93,18 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
                                 </NavLink>
                             ))}
                             
-                            <div className="mt-8 mb-4 px-6 pt-4 border-t border-gray-200/50 dark:border-[#2A2A2A]/50">
-                                <span className="text-gray-400 dark:text-[#8A8A8A] font-mono text-[10px] tracking-widest uppercase">[ UPCOMING ]</span>
+                            <div className="mt-8 mb-4 px-6 pt-4 border-t border-border/50">
+                                <span className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">[ UPCOMING ]</span>
                             </div>
                             
-                            <div className="flex items-center justify-between px-6 py-3 text-sm font-bold text-gray-400 dark:text-[#8A8A8A] cursor-not-allowed">
+                            <div className="flex items-center justify-between px-6 py-3 text-sm font-bold text-muted-foreground cursor-not-allowed">
                                 <div className="flex items-center gap-3">
                                     <BarChart className="w-4 h-4" />
                                     BENCHMARKS
                                 </div>
-                                <span className="text-[10px] font-mono text-blue-500 dark:text-[#9D4EDD] bg-blue-50 dark:bg-[#9D4EDD]/10 border border-blue-200 dark:border-[#9D4EDD]/30 px-1.5 rounded">SOON</span>
+                                <span className="text-[10px] font-mono text-info bg-info/10 border border-info/30 px-1.5 rounded">SOON</span>
                             </div>
-                            <div className="flex items-center justify-between px-6 py-3 text-sm font-bold text-gray-400 dark:text-[#8A8A8A] cursor-not-allowed">
+                            <div className="flex items-center justify-between px-6 py-3 text-sm font-bold text-muted-foreground cursor-not-allowed">
                                 <div className="flex items-center gap-3">
                                     <Settings className="w-4 h-4" />
                                     SETTINGS
@@ -114,15 +114,15 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
                     </div>
 
                     {/* Bottom Section (Tenant) */}
-                    <div className="p-4 m-4 border border-gray-200/50 dark:border-[#2A2A2A] rounded-xl bg-white/40 dark:bg-black/20 backdrop-blur-md">
-                        <div className="text-gray-500 dark:text-[#8A8A8A] font-mono text-xs tracking-widest mb-3">ACTIVE TENANT</div>
+                    <div className="p-4 m-4 border border-border rounded-xl bg-card/40 backdrop-blur-md">
+                        <div className="text-muted-foreground font-mono text-xs tracking-widest mb-3">ACTIVE TENANT</div>
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white dark:bg-[#0A0A0A] border border-gray-200 dark:border-[#2A2A2A] text-blue-500 dark:text-[#9D4EDD] flex items-center justify-center font-bold text-xl rounded-lg shadow-sm">
+                            <div className="w-10 h-10 bg-background border border-border text-primary flex items-center justify-center font-bold text-xl rounded-lg shadow-sm">
                                 {(user.companyName || 'C').charAt(0).toUpperCase()}
                             </div>
                             <div className="flex flex-col">
                                 <span className="font-bold text-sm tracking-tight">{user.companyName || 'Company'}</span>
-                                <span className="text-blue-500 dark:text-[#00FF66] font-mono text-[10px]">{user.role.toUpperCase()} SESSION</span>
+                                <span className="text-nexus-green font-mono text-[10px]">{user.role.toUpperCase()} SESSION</span>
                             </div>
                         </div>
                     </div>

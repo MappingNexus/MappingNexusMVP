@@ -135,7 +135,7 @@ function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0a0a0c] flex items-center justify-center transition-colors duration-500">
+            <div className="min-h-screen bg-background flex items-center justify-center transition-colors duration-500">
                 <LoadingSpinner message="Initializing Mapping Nexus..." />
             </div>
         );

@@ -111,9 +111,9 @@ const HRProjects: React.FC = () => {
     };
 
     const statusBadge = (s: string) => {
-        if (s === 'active') return 'border-blue-500 dark:border-[#00FF66]/30 text-blue-500 dark:text-[#00FF66] bg-[#00FF66]/10';
-        if (s === 'completed') return 'border-[#9D4EDD]/30 text-[#9D4EDD] bg-[#9D4EDD]/10';
-        return 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#8a8a8a]';
+        if (s === 'active') return 'border-nexus-green/30 text-nexus-green bg-nexus-green/10';
+        if (s === 'completed') return 'border-nexus-purple/30 text-nexus-purple bg-nexus-purple/10';
+        return 'border-border text-muted-foreground';
     };
 
     if (loading) return <LoadingSpinner message="Loading projects..." />;
@@ -122,23 +122,23 @@ const HRProjects: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-end justify-between">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Projects</h1>
-                    <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">{projects.length} total • {activeProjects} active or planned</p>
+                    <h1 className="text-3xl font-black text-foreground uppercase tracking-tight">Projects</h1>
+                    <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">{projects.length} total • {activeProjects} active or planned</p>
                 </div>
-                <button onClick={() => startEditing()} className="bg-white text-black font-bold uppercase tracking-widest text-xs px-6 py-2.5 hover:bg-gray-200 transition-colors flex items-center gap-2">
+                <button onClick={() => startEditing()} className="bg-primary text-primary-foreground font-bold uppercase tracking-widest text-xs px-6 py-2.5 hover:opacity-90 transition-opacity flex items-center gap-2">
                     <Plus className="w-4 h-4" /> New Project
                 </button>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-[1.2fr,0.8fr] gap-6">
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight mb-4">{editingId ? 'Edit Project' : 'Create Project'}</h2>
+                <div className="bg-card border border-border p-6">
+                    <h2 className="text-xl font-black text-foreground uppercase tracking-tight mb-4">{editingId ? 'Edit Project' : 'Create Project'}</h2>
                     <form onSubmit={submit} className="space-y-4">
-                        <input value={form.projectName} onChange={e => setForm({ ...form, projectName: e.target.value })} placeholder="Project name" className="w-full bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors" />
+                        <input value={form.projectName} onChange={e => setForm({ ...form, projectName: e.target.value })} placeholder="Project name" className="w-full bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors placeholder:text-muted-foreground" />
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors" />
-                            <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors" />
-                            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as Project['status'] })} className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors">
+                            <input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors" />
+                            <input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors" />
+                            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as Project['status'] })} className="bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors">
                                 <option value="planned">Planned</option>
                                 <option value="active">Active</option>
                                 <option value="completed">Completed</option>
@@ -147,34 +147,34 @@ const HRProjects: React.FC = () => {
 
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a]">Required Skills</p>
-                                <button type="button" onClick={addSkillRow} className="text-xs text-blue-500 dark:text-[#00FF66] hover:text-gray-900 dark:text-white font-mono">+ add skill</button>
+                                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Required Skills</p>
+                                <button type="button" onClick={addSkillRow} className="text-xs text-nexus-green hover:text-foreground font-mono">+ add skill</button>
                             </div>
                             {form.requiredSkills.map((skill, index) => (
                                 <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <input value={skill.skill_name} onChange={e => updateSkill(index, 'skill_name', e.target.value)} placeholder="Skill name" className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors" />
-                                    <select value={skill.proficiency} onChange={e => updateSkill(index, 'proficiency', e.target.value)} className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors">
+                                    <input value={skill.skill_name} onChange={e => updateSkill(index, 'skill_name', e.target.value)} placeholder="Skill name" className="bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors placeholder:text-muted-foreground" />
+                                    <select value={skill.proficiency} onChange={e => updateSkill(index, 'proficiency', e.target.value)} className="bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors">
                                         <option value="beginner">Beginner</option>
                                         <option value="intermediate">Intermediate</option>
                                         <option value="expert">Expert</option>
                                     </select>
-                                    <input type="number" min="1" value={skill.count} onChange={e => updateSkill(index, 'count', e.target.value)} placeholder="Count" className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-3 text-gray-900 dark:text-white outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors" />
+                                    <input type="number" min="1" value={skill.count} onChange={e => updateSkill(index, 'count', e.target.value)} placeholder="Count" className="bg-transparent border border-border px-4 py-3 text-foreground outline-none focus:border-ring transition-colors placeholder:text-muted-foreground" />
                                 </div>
                             ))}
                         </div>
 
                         {error && (
-                            <div className="flex items-start gap-3 p-4 bg-[#FF3333]/5 border-l-2 border-[#FF3333] text-[#FF3333] font-mono text-xs">
+                            <div className="flex items-start gap-3 p-4 bg-destructive/5 border-l-2 border-destructive text-destructive font-mono text-xs">
                                 {error}
                             </div>
                         )}
                         {success && (
-                            <div className="flex items-start gap-3 p-4 bg-[#00FF66]/5 border-l-2 border-blue-500 dark:border-[#00FF66] text-blue-500 dark:text-[#00FF66] font-mono text-xs">
+                            <div className="flex items-start gap-3 p-4 bg-success/5 border-l-2 border-success text-success font-mono text-xs">
                                 {success}
                             </div>
                         )}
 
-                        <button type="submit" disabled={saving} className="w-full bg-white text-black font-bold uppercase tracking-widest text-xs py-3 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button type="submit" disabled={saving} className="w-full bg-primary text-primary-foreground font-bold uppercase tracking-widest text-xs py-3 hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
                             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : editingId ? 'Update Project' : 'Create Project'}
                         </button>
                     </form>
@@ -182,20 +182,20 @@ const HRProjects: React.FC = () => {
 
                 <div className="space-y-4">
                     {projects.length === 0 ? (
-                        <div className="border border-dashed border-gray-200 dark:border-white/10 p-10 text-center">
-                            <FolderKanban className="w-10 h-10 text-gray-500 dark:text-[#8a8a8a] mx-auto mb-3" />
-                            <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">➔ No projects created yet.</p>
+                        <div className="border border-dashed border-border p-10 text-center">
+                            <FolderKanban className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                            <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">➔ No projects created yet.</p>
                         </div>
                     ) : projects.map(project => (
-                        <button key={project.project_id} onClick={() => startEditing(project)} className="w-full text-left bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-5 hover:border-blue-500 dark:hover:border-[#00FF66]/30 transition-colors">
+                        <button key={project.project_id} onClick={() => startEditing(project)} className="w-full text-left bg-card border border-border p-5 hover:border-ring transition-colors">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
-                                    <h3 className="text-gray-900 dark:text-white font-bold uppercase">{project.project_name}</h3>
-                                    <p className="text-[10px] text-gray-500 dark:text-[#8a8a8a] font-mono mt-1">{project.required_skills?.length || 0} skill requirements</p>
+                                    <h3 className="text-foreground font-bold uppercase">{project.project_name}</h3>
+                                    <p className="text-[10px] text-muted-foreground font-mono mt-1">{project.required_skills?.length || 0} skill requirements</p>
                                 </div>
                                 <span className={`border text-[10px] font-mono uppercase tracking-widest px-3 py-1 ${statusBadge(project.status)}`}>{project.status}</span>
                             </div>
-                            <div className="mt-3 text-xs text-gray-500 dark:text-[#8a8a8a] font-mono">
+                            <div className="mt-3 text-xs text-muted-foreground font-mono">
                                 {project.start_date ? `Start ${new Date(project.start_date).toLocaleDateString()}` : 'Start TBD'}
                                 {' • '}
                                 {project.end_date ? `End ${new Date(project.end_date).toLocaleDateString()}` : 'No end date'}

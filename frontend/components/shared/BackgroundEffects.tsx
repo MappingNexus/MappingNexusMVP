@@ -18,15 +18,15 @@ const BackgroundEffects: React.FC = () => {
 
     return (
         <div className="absolute inset-0 z-[0] pointer-events-none overflow-hidden fixed">
-            {/* Mouse follow spotlight (The Blue Thing) */}
+            {/* Mouse follow spotlight */}
             <div 
-                className="fixed top-0 left-0 w-[600px] h-[600px] bg-blue-500/10 dark:bg-blue-500/20 blur-[130px] rounded-full transition-all duration-[50ms] ease-linear will-change-transform mix-blend-normal dark:mix-blend-screen z-[1]"
+                className="fixed top-0 left-0 w-[600px] h-[600px] bg-primary/5 dark:bg-primary/10 blur-[130px] rounded-full transition-all duration-[50ms] ease-linear will-change-transform mix-blend-normal dark:mix-blend-screen z-[1]"
                 style={{ transform: `translate(${cursorPos.x - 300}px, ${cursorPos.y - 300}px)` }}
             />
 
-            {/* Top gradients (Purple/Blue mix) */}
+            {/* Top gradient blob */}
             <div 
-                className="absolute top-0 left-[20%] w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] bg-purple-400/20 dark:bg-purple-600/15 blur-[120px] rounded-full mix-blend-multiply dark:mix-blend-lighten transition-transform duration-300 ease-out z-[2]" 
+                className="absolute top-0 left-[20%] w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] bg-accent/30 dark:bg-accent/15 blur-[120px] rounded-full mix-blend-multiply dark:mix-blend-lighten transition-transform duration-300 ease-out z-[2]" 
                 style={{ transform: `translate(${mousePosition.x * -30}px, ${mousePosition.y * -30}px)` }}
             />
             
@@ -38,7 +38,7 @@ const BackgroundEffects: React.FC = () => {
                     style={{ transform: `translate(${mousePosition.x * -10}px, ${mousePosition.y * -10}px)` }}
                 />
                 
-                {/* Deep Perspective floor mesh (Static scrolling) */}
+                {/* Deep Perspective floor mesh */}
                 <div 
                     className="absolute bottom-[-20vh] left-[-50vw] right-[-50vw] w-[200vw] h-[120vh] bg-[linear-gradient(to_right,#30303020_1px,transparent_1px),linear-gradient(to_bottom,#30303030_2px,transparent_2px)] bg-[size:80px_80px] [mask-image:linear-gradient(to_bottom,transparent_10%,#000_100%)] dark:opacity-50"
                     style={{

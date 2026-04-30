@@ -26,21 +26,21 @@ const AuditLog: React.FC = () => {
     };
 
     const actionColor = (a: string) => {
-        if (a.includes('blocked') || a.includes('unauthorized')) return 'text-[#FF3333] bg-[#FF3333]/10 border-[#FF3333]/20';
-        if (a.includes('created') || a.includes('approved')) return 'text-blue-500 dark:text-[#00FF66] bg-[#00FF66]/10 border-blue-500 dark:border-[#00FF66]/20';
-        if (a.includes('rejected') || a.includes('archived')) return 'text-[#FF9900] bg-[#FF9900]/10 border-[#FF9900]/20';
-        return 'text-[#9D4EDD] bg-[#9D4EDD]/10 border-[#9D4EDD]/20';
+        if (a.includes('blocked') || a.includes('unauthorized')) return 'text-nexus-red bg-nexus-red/10 border-nexus-red/20';
+        if (a.includes('created') || a.includes('approved')) return 'text-nexus-green bg-nexus-green/10 border-nexus-green/20';
+        if (a.includes('rejected') || a.includes('archived')) return 'text-nexus-orange bg-nexus-orange/10 border-nexus-orange/20';
+        return 'text-nexus-purple bg-nexus-purple/10 border-nexus-purple/20';
     };
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Audit Log</h1>
-                    <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">Append-only action trail</p>
+                    <h1 className="text-3xl font-black text-foreground uppercase tracking-tight">Audit Log</h1>
+                    <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">Append-only action trail</p>
                 </div>
                 <select value={filter} onChange={e => { setFilter(e.target.value); setOffset(0); }}
-                    className="bg-transparent border border-gray-200 dark:border-white/10 px-4 py-2 text-gray-900 dark:text-white text-sm outline-none focus:border-blue-500 dark:border-[#00FF66] transition-colors">
+                    className="bg-transparent border border-border px-4 py-2 text-foreground text-sm outline-none focus:border-ring transition-colors">
                     <option value="">All Actions</option>
                     <option value="employee_created">Employee Created</option>
                     <option value="employee_edited">Employee Edited</option>
@@ -54,35 +54,35 @@ const AuditLog: React.FC = () => {
             </div>
 
             {loading ? <LoadingSpinner /> : (
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 overflow-hidden">
+                <div className="bg-card border border-border overflow-hidden">
                     <table className="w-full">
-                        <thead><tr className="border-b border-gray-200 dark:border-white/10">
+                        <thead><tr className="border-b border-border">
                             {['Time', 'Action', 'Actor Role', 'Target', 'Details'].map(h => (
-                                <th key={h} className="text-left font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] px-5 py-3">{h}</th>
+                                <th key={h} className="text-left font-mono text-[10px] uppercase tracking-widest text-muted-foreground px-5 py-3">{h}</th>
                             ))}
                         </tr></thead>
                         <tbody>
                             {logs.map(log => (
-                                <tr key={log.log_id} className="border-b border-gray-200 dark:border-white/10/50 hover:bg-white/[0.02]">
-                                    <td className="px-5 py-3 text-xs text-gray-500 dark:text-[#8a8a8a] whitespace-nowrap font-mono">{new Date(log.created_at).toLocaleString()}</td>
+                                <tr key={log.log_id} className="border-b border-border/50 hover:bg-accent/30">
+                                    <td className="px-5 py-3 text-xs text-muted-foreground whitespace-nowrap font-mono">{new Date(log.created_at).toLocaleString()}</td>
                                     <td className="px-5 py-3"><span className={`text-[10px] font-mono uppercase tracking-widest px-3 py-1 border ${actionColor(log.action)}`}>{log.action}</span></td>
-                                    <td className="px-5 py-3 text-sm text-gray-500 dark:text-[#8a8a8a] capitalize">{log.actor_role}</td>
-                                    <td className="px-5 py-3 text-xs text-gray-500 dark:text-[#8a8a8a] font-mono">{log.target_id?.substring(0, 8) || '—'}</td>
-                                    <td className="px-5 py-3 text-xs text-gray-500 dark:text-[#8a8a8a] max-w-xs truncate font-mono">{JSON.stringify(log.metadata).substring(0, 80)}</td>
+                                    <td className="px-5 py-3 text-sm text-muted-foreground capitalize">{log.actor_role}</td>
+                                    <td className="px-5 py-3 text-xs text-muted-foreground font-mono">{log.target_id?.substring(0, 8) || '—'}</td>
+                                    <td className="px-5 py-3 text-xs text-muted-foreground max-w-xs truncate font-mono">{JSON.stringify(log.metadata).substring(0, 80)}</td>
                                 </tr>
                             ))}
-                            {logs.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">➔ No audit logs found</td></tr>}
+                            {logs.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest">➔ No audit logs found</td></tr>}
                         </tbody>
                     </table>
 
                     {total > PAGE_SIZE && (
-                        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 dark:border-white/10">
-                            <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono">Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of {total}</p>
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+                            <p className="text-xs text-muted-foreground font-mono">Showing {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} of {total}</p>
                             <div className="flex gap-2">
                                 <button onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))} disabled={offset === 0}
-                                    className="p-1.5 bg-white/80 dark:bg-[#1a1a1c]/80 backdrop-blur-md border border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#8a8a8a] hover:text-gray-900 dark:text-white disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                                    className="p-1.5 bg-card/80 backdrop-blur-md border border-border text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
                                 <button onClick={() => setOffset(offset + PAGE_SIZE)} disabled={offset + PAGE_SIZE >= total}
-                                    className="p-1.5 bg-white/80 dark:bg-[#1a1a1c]/80 backdrop-blur-md border border-gray-200 dark:border-white/10 text-gray-500 dark:text-[#8a8a8a] hover:text-gray-900 dark:text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+                                    className="p-1.5 bg-card/80 backdrop-blur-md border border-border text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
                             </div>
                         </div>
                     )}
