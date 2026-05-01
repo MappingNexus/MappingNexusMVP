@@ -101,7 +101,7 @@ const PublicLayout: React.FC<Props> = ({ children, hideHeader = false, navVarian
  </header>
  )}
 
- {hideHeader && (
+ {/* {hideHeader && (
  <div className="cb-container pt-8">
  <div className="flex items-center justify-between">
  <button type="button" onClick={() => navigate('/')} className="cb-wordmark" aria-label="Go to home">
@@ -118,7 +118,7 @@ const PublicLayout: React.FC<Props> = ({ children, hideHeader = false, navVarian
  )}
  </div>
  </div>
- )}
+ )} */}
 
  {menuOpen && (
  <div className="fixed inset-0 z-[60]">
