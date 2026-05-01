@@ -1,5 +1,5 @@
 /**
- * HR Skill Pulse — wraps analytics/skills endpoint
+ * HR Skill Pulse — analytics/skills
  */
 import React, { useEffect, useState } from 'react';
 import * as api from '../../services/api';
@@ -7,122 +7,144 @@ import type { SkillPulseData } from '../../types';
 import LoadingSpinner from '../shared/LoadingSpinner';
 
 const HRSkillPulse: React.FC = () => {
-    const [data, setData] = useState<SkillPulseData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+ const [data, setData] = useState<SkillPulseData | null>(null);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        let isActive = true;
+ useEffect(() => {
+ let isActive = true;
+ const loadSkillPulse = async () => {
+ const response = await api.getSkillPulse();
+ if (!isActive) return;
+ if (response.success) {
+ setData(response.data);
+ setError(null);
+ } else {
+ setData(null);
+ setError(api.getErrorMessage(response, 'Failed to load skill data.'));
+ }
+ setLoading(false);
+ };
+ void loadSkillPulse();
+ return () => {
+ isActive = false;
+ };
+ }, []);
 
-        const loadSkillPulse = async () => {
-            const response = await api.getSkillPulse();
-            if (!isActive) return;
+ if (loading) return <LoadingSpinner message="Loading skill pulse…" />;
+ if (!data) return <p className="text-muted-foreground text-sm">{error || 'Failed to load skill data.'}</p>;
 
-            if (response.success) {
-                setData(response.data);
-                setError(null);
-            } else {
-                setData(null);
-                setError(api.getErrorMessage(response, 'Failed to load skill data.'));
-            }
+ return (
+ <div className="cb-page">
+ <div className="cb-page-header">
+ <div>
+ <h1 className="cb-h1">Skill pulse</h1>
+ <p className="cb-subtitle mt-3">Talent density, trending movement, dormant inventory, and gaps.</p>
+ </div>
+ </div>
 
-            setLoading(false);
-        };
+ <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+ <div className="cb-card p-8">
+ <div className="mb-6">
+ <p className="cb-caption mb-2">Inventory</p>
+ <h2 className="cb-h2">Top skills</h2>
+ <p className="cb-body text-sm mt-2">
+ <span className="font-mono">{data.topSkills.length}</span> skills ranked by demand score.
+ </p>
+ </div>
+ <div className="space-y-5">
+ {data.topSkills.map((s) => (
+ <div key={s.name}>
+ <div className="flex justify-between items-baseline gap-3 text-sm mb-2">
+ <span className="text-foreground font-medium">{s.name}</span>
+ <span className="cb-body">
+ <span className="font-mono">{s.employeeCount}</span> employees
+ </span>
+ </div>
+ <div className="bg-muted h-2 rounded-full overflow-hidden border border-border">
+ <div className="h-full" style={{ width: `${s.demandScore}%`, backgroundColor: 'hsl(var(--primary))' }} />
+ </div>
+ </div>
+ ))}
+ {data.topSkills.length === 0 && <p className="cb-body text-sm">No skills yet.</p>}
+ </div>
+ </div>
 
-        void loadSkillPulse();
+ <div className="cb-card p-8">
+ <div className="mb-6">
+ <p className="cb-caption mb-2">Momentum</p>
+ <h2 className="cb-h2">Trending skills</h2>
+ </div>
+ <div className="space-y-3">
+ {data.trendingSkills.map((s) => (
+ <div key={s.name} className="border border-border rounded-2xl p-5 flex items-center justify-between">
+ <span className="text-foreground font-medium">{s.name}</span>
+ <span className="font-mono text-sm text-nexus-green">{s.growthPercent}</span>
+ </div>
+ ))}
+ {data.trendingSkills.length === 0 && (
+ <div className="border border-dashed border-border rounded-2xl p-10 text-center text-muted-foreground text-sm">
+ No trending data.
+ </div>
+ )}
+ </div>
+ </div>
 
-        return () => {
-            isActive = false;
-        };
-    }, []);
+ <div className="cb-card p-8">
+ <div className="mb-6">
+ <p className="cb-caption mb-2">Hygiene</p>
+ <h2 className="cb-h2">Dormant skills</h2>
+ <p className="cb-body text-sm mt-2">Unused for more than 90 days.</p>
+ </div>
+ <div className="divide-y divide-border">
+ {data.dormantSkills.map((s) => (
+ <div key={s.name} className="py-4 flex items-start justify-between gap-4">
+ <div>
+ <div className="text-foreground font-medium">{s.name}</div>
+ <div className="cb-body text-sm mt-1">
+ <span className="font-mono">{s.employeeCount}</span> employees • avg <span className="font-mono">{s.avgDaysSinceUsed}d</span>
+ </div>
+ </div>
+ <span className="cb-pill">Dormant</span>
+ </div>
+ ))}
+ {data.dormantSkills.length === 0 && <p className="cb-body text-sm py-4">No dormant skills.</p>}
+ </div>
+ </div>
 
-    if (loading) return <LoadingSpinner message="Loading Skill Pulse..." />;
-    if (!data) return <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs">{error || 'Failed to load skill data.'}</p>;
-
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Skill Pulse</h1>
-                <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">Talent density and skill analysis</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Top Skills */}
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">Top Skills ({data.topSkills.length})</h3>
-                    {data.topSkills.map((s, i) => (
-                        <div key={i} className="mb-4">
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="text-gray-900 dark:text-white">{s.name}</span>
-                                <span className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs">{s.employeeCount} employees</span>
-                            </div>
-                            <div className="bg-gray-100 dark:bg-[#2a2a2a] h-2">
-                                <div className="bg-[#9D4EDD] h-2 transition-all duration-500" style={{ width: `${s.demandScore}%` }} />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Trending */}
-                <div className="space-y-3">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase">Trending Skills</h3>
-                    {data.trendingSkills.map((s, i) => (
-                        <div key={i} className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-5 flex justify-between items-center">
-                            <span className="text-gray-900 dark:text-white font-medium">{s.name}</span>
-                            <span className="text-blue-500 dark:text-[#00FF66] font-mono text-sm">{s.growthPercent}</span>
-                        </div>
-                    ))}
-                    {data.trendingSkills.length === 0 && (
-                        <div className="border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">
-                            ➔ No trending data
-                        </div>
-                    )}
-                </div>
-
-                {/* Dormant Skills */}
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">
-                        Dormant Skills <span className="text-[10px] text-gray-500 dark:text-[#8a8a8a] font-mono normal-case tracking-normal">(unused &gt; 90 days)</span>
-                    </h3>
-                    {data.dormantSkills.map((s, i) => (
-                        <div key={i} className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-white/10 last:border-0">
-                            <div>
-                                <span className="text-gray-900 dark:text-white">{s.name}</span>
-                                <span className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono ml-2">{s.employeeCount} employees • avg {s.avgDaysSinceUsed}d</span>
-                            </div>
-                            <span className="border border-[#FF9900]/20 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-[#FF9900] bg-[#FF9900]/10">Dormant</span>
-                        </div>
-                    ))}
-                    {data.dormantSkills.length === 0 && (
-                        <div className="border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">
-                            ➔ No dormant skills
-                        </div>
-                    )}
-                </div>
-
-                {/* Skill Gaps */}
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">Skill Gaps</h3>
-                    {data.skillGaps.map((g, i) => (
-                        <div key={i} className="mb-4">
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="text-gray-900 dark:text-white">{g.name}</span>
-                                <span className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs">Gap: {g.gap}</span>
-                            </div>
-                            <div className="bg-gray-100 dark:bg-[#2a2a2a] h-1.5">
-                                <div className="bg-[#FF3333] h-1.5" style={{ width: `${Math.min(100, (g.gap / Math.max(1, g.total)) * 100)}%` }} />
-                            </div>
-                        </div>
-                    ))}
-                    {data.skillGaps.length === 0 && (
-                        <div className="border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">
-                            ➔ No skill gaps detected
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
+ <div className="cb-card p-8">
+ <div className="mb-6">
+ <p className="cb-caption mb-2">Capacity</p>
+ <h2 className="cb-h2">Skill gaps</h2>
+ </div>
+ <div className="space-y-5">
+ {data.skillGaps.map((g) => (
+ <div key={g.name}>
+ <div className="flex justify-between items-baseline gap-3 text-sm mb-2">
+ <span className="text-foreground font-medium">{g.name}</span>
+ <span className="cb-body">
+ Gap: <span className="font-mono">{g.gap}</span>
+ </span>
+ </div>
+ <div className="bg-muted h-2 rounded-full overflow-hidden border border-border">
+ <div
+ className="h-full"
+ style={{ width: `${Math.min(100, (g.gap / Math.max(1, g.total)) * 100)}%`, backgroundColor: '#cf202f' }}
+ />
+ </div>
+ </div>
+ ))}
+ {data.skillGaps.length === 0 && (
+ <div className="border border-dashed border-border rounded-2xl p-10 text-center text-muted-foreground text-sm">
+ No skill gaps detected.
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ </div>
+ );
 };
 
 export default HRSkillPulse;
+

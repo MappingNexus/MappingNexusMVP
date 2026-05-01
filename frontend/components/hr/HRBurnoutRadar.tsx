@@ -1,128 +1,160 @@
 /**
- * HR Burnout Radar — wraps analytics/burnout endpoint
+ * HR Burnout Radar — analytics/burnout
  */
-import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as api from '../../services/api';
 import type { BurnoutData } from '../../types';
 import LoadingSpinner from '../shared/LoadingSpinner';
 
 const HRBurnoutRadar: React.FC = () => {
-    const [data, setData] = useState<BurnoutData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+ const [data, setData] = useState<BurnoutData | null>(null);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        let isActive = true;
+ useEffect(() => {
+ let isActive = true;
+ const loadBurnoutData = async () => {
+ const response = await api.getBurnoutData();
+ if (!isActive) return;
+ if (response.success) {
+ setData(response.data);
+ setError(null);
+ } else {
+ setData(null);
+ setError(api.getErrorMessage(response, 'Failed to load burnout data.'));
+ }
+ setLoading(false);
+ };
+ void loadBurnoutData();
+ return () => {
+ isActive = false;
+ };
+ }, []);
 
-        const loadBurnoutData = async () => {
-            const response = await api.getBurnoutData();
-            if (!isActive) return;
+ const fatigueChange = typeof data?.fatigueChange === 'number' ? data.fatigueChange : null;
 
-            if (response.success) {
-                setData(response.data);
-                setError(null);
-            } else {
-                setData(null);
-                setError(api.getErrorMessage(response, 'Failed to load burnout data.'));
-            }
+ const tooltipStyle = useMemo(
+ () => ({
+ backgroundColor: 'var(--tooltip-bg)',
+ border: '1px solid var(--tooltip-border)',
+ borderRadius: 16,
+ fontFamily: 'var(--font-sans)',
+ fontSize: 12,
+ color: 'var(--tooltip-text)',
+ }),
+ [],
+ );
 
-            setLoading(false);
-        };
+ if (loading) return <LoadingSpinner message="Loading burnout radar…" />;
+ if (!data) return <p className="text-muted-foreground text-sm">{error || 'Failed to load burnout data.'}</p>;
 
-        void loadBurnoutData();
+ const tierText = (tier: string) => (tier === 'critical' ? 'text-nexus-red' : tier === 'warning' ? 'text-nexus-orange' : 'text-nexus-green');
 
-        return () => {
-            isActive = false;
-        };
-    }, []);
+ return (
+ <div className="cb-page">
+ <div className="cb-page-header">
+ <div>
+ <h1 className="cb-h1">Burnout radar</h1>
+ <p className="cb-subtitle mt-3">Real-time fatigue signals and risk concentration by department.</p>
+ </div>
+ </div>
 
-    if (loading) return <LoadingSpinner message="Loading Burnout Radar..." />;
-    if (!data) return <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs">{error || 'Failed to load burnout data.'}</p>;
+ <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+ <div className="cb-card p-8">
+ <p className="cb-caption">Global fatigue index</p>
+ <p className="mt-4 text-5xl font-mono font-medium text-foreground">{data.globalFatigueIndex}%</p>
+ <div className="mt-4 text-sm">
+ {fatigueChange === null ? (
+ <span className="cb-body">Historical trend unavailable</span>
+ ) : (
+ <span className={`font-mono ${fatigueChange < 0 ? 'text-nexus-green' : 'text-nexus-red'}`}>
+ {fatigueChange < 0 ? '↓' : '↑'} {Math.abs(fatigueChange)}%
+ <span className="cb-body font-sans"> vs last month</span>
+ </span>
+ )}
+ </div>
+ </div>
 
-    const tierColor = (t: string) => t === 'critical' ? 'text-[#FF3333]' : t === 'warning' ? 'text-[#FF9900]' : 'text-blue-500 dark:text-[#00FF66]';
-    const tierBg = (t: string) => t === 'Critical' ? 'bg-[#FF3333]/10 text-[#FF3333] border-[#FF3333]/20' : t === 'Warning' ? 'bg-[#FF9900]/10 text-[#FF9900] border-[#FF9900]/20' : 'bg-[#00FF66]/10 text-blue-500 dark:text-[#00FF66] border-blue-500 dark:border-[#00FF66]/20';
-    const fatigueChange = typeof data.fatigueChange === 'number' ? data.fatigueChange : null;
+ <div className="cb-card p-8">
+ <p className="cb-caption">High risk</p>
+ <p className="mt-4 text-5xl font-mono font-medium text-nexus-red">{data.highRiskEmployees.length}</p>
+ <p className="cb-body text-sm mt-4">Employees flagged</p>
+ </div>
 
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Burnout Radar</h1>
-                <p className="text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">Real-time fatigue analysis</p>
-            </div>
+ <div className="cb-card p-8">
+ <p className="cb-caption">Prevention ROI</p>
+ <p className="mt-4 text-5xl font-mono font-medium text-nexus-green">{data.costPreventionROI}</p>
+ <p className="cb-body text-sm mt-4">Estimated savings</p>
+ </div>
+ </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-2">Global Fatigue Index</p>
-                    <p className="text-4xl font-black text-gray-900 dark:text-white">{data.globalFatigueIndex}%</p>
-                    {fatigueChange === null ? (
-                        <p className="text-xs mt-1 text-gray-500 dark:text-[#8a8a8a] font-mono">Historical trend unavailable</p>
-                    ) : (
-                        <p className={`text-xs mt-1 font-mono ${fatigueChange < 0 ? 'text-blue-500 dark:text-[#00FF66]' : 'text-[#FF3333]'}`}>
-                            {fatigueChange < 0 ? '↓' : '↑'} {Math.abs(fatigueChange)}% vs last month
-                        </p>
-                    )}
-                </div>
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-2">High Risk</p>
-                    <p className="text-4xl font-black text-[#FF3333]">{data.highRiskEmployees.length}</p>
-                    <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono mt-1">employees flagged</p>
-                </div>
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mb-2">Prevention ROI</p>
-                    <p className="text-4xl font-black text-blue-500 dark:text-[#00FF66]">{data.costPreventionROI}</p>
-                    <p className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono mt-1">estimated savings</p>
-                </div>
-            </div>
+ <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+ <div className="cb-card p-8">
+ <div className="mb-6">
+ <p className="cb-caption mb-2">Departments</p>
+ <h2 className="cb-h2">Fatigue distribution</h2>
+ </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">Department Fatigue</h3>
-                    {data.departmentFatigue.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={250}>
-                            <BarChart data={data.departmentFatigue}>
-                                <XAxis dataKey="name" tick={{ fill: '#8A8A8A', fontSize: 11 }} axisLine={{ stroke: '#2A2A2A' }} tickLine={false} />
-                                <YAxis tick={{ fill: '#8A8A8A', fontSize: 11 }} axisLine={{ stroke: '#2A2A2A' }} tickLine={false} />
-                                <Tooltip contentStyle={{ backgroundColor: 'var(--tooltip-bg, #fff)', border: '1px solid #e5e7eb', borderRadius: 0, fontFamily: 'monospace', fontSize: 12, color: '#111' }} />
-                                <Bar dataKey="value" fill="#9D4EDD" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : <p className="text-gray-500 dark:text-[#8a8a8a] text-sm font-mono">No data</p>}
-                    <div className="mt-4 space-y-3">
-                        {data.departmentFatigue.map(d => (
-                            <div key={d.name} className="flex items-center justify-between">
-                                <span className="text-sm text-gray-500 dark:text-[#8a8a8a]">{d.name}</span>
-                                <span className={`text-sm font-medium font-mono ${tierColor(d.tier)}`}>{d.value}%</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+ {data.departmentFatigue.length > 0 ? (
+ <ResponsiveContainer width="100%" height={260}>
+ <BarChart data={data.departmentFatigue}>
+ <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={{ stroke: 'hsl(var(--border))' }} tickLine={false} />
+ <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} axisLine={{ stroke: 'hsl(var(--border))' }} tickLine={false} />
+ <Tooltip contentStyle={tooltipStyle} />
+ <Bar dataKey="value" fill="#0052ff" />
+ </BarChart>
+ </ResponsiveContainer>
+ ) : (
+ <p className="cb-body text-sm">No department data.</p>
+ )}
 
-                <div className="bg-white dark:bg-[#0f0f0f] border border-gray-200 dark:border-white/10 p-6">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white uppercase mb-4">High Risk Employees</h3>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {data.highRiskEmployees.map(emp => (
-                            <div key={emp.id} className="border border-gray-200 dark:border-white/10 bg-white/50 dark:bg-black/50 backdrop-blur-md p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="font-bold text-gray-900 dark:text-white uppercase text-sm">{emp.name || 'Unknown Employee'}</span>
-                                    <span className={`text-[10px] font-mono uppercase tracking-widest px-3 py-1 border ${tierBg(emp.riskTier)}`}>{emp.riskTier}</span>
-                                </div>
-                                <div className="w-full bg-gray-100 dark:bg-[#2a2a2a] h-1.5 mb-2">
-                                    <div className="bg-gradient-to-r from-[#FF9900] to-[#FF3333] h-1.5" style={{ width: `${emp.riskScore}%` }} />
-                                </div>
-                                {emp.signals.map((s, i) => <p key={i} className="text-xs text-gray-500 dark:text-[#8a8a8a] font-mono">• {s}</p>)}
-                            </div>
-                        ))}
-                        {data.highRiskEmployees.length === 0 && (
-                            <div className="border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-gray-500 dark:text-[#8a8a8a] font-mono text-xs uppercase tracking-widest">
-                                ➔ No high-risk employees
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+ {data.departmentFatigue.length > 0 && (
+ <div className="mt-6 space-y-3">
+ {data.departmentFatigue.map((d) => (
+ <div key={d.name} className="flex items-center justify-between">
+ <span className="cb-body text-sm">{d.name}</span>
+ <span className={`text-sm font-mono ${tierText(d.tier)}`}>{d.value}%</span>
+ </div>
+ ))}
+ </div>
+ )}
+ </div>
+
+ <div className="cb-card p-8">
+ <div className="mb-6">
+ <p className="cb-caption mb-2">People</p>
+ <h2 className="cb-h2">High risk employees</h2>
+ </div>
+
+ <div className="space-y-3 max-h-96 overflow-y-auto">
+ {data.highRiskEmployees.map((emp) => (
+ <div key={emp.id} className="border border-border rounded-2xl p-5">
+ <div className="flex items-center justify-between gap-3 mb-3">
+ <span className="font-semibold text-foreground">{emp.name || 'Unknown employee'}</span>
+ <span className="cb-pill">{emp.riskTier}</span>
+ </div>
+ <div className="w-full bg-muted h-2 rounded-full overflow-hidden border border-border mb-3">
+ <div className="h-full" style={{ width: `${emp.riskScore}%`, backgroundColor: 'hsl(var(--primary))' }} />
+ </div>
+ {emp.signals.map((s, i) => (
+ <p key={i} className="cb-body text-sm">
+ • {s}
+ </p>
+ ))}
+ </div>
+ ))}
+ {data.highRiskEmployees.length === 0 && (
+ <div className="border border-dashed border-border rounded-2xl p-10 text-center text-muted-foreground text-sm">
+ No high-risk employees.
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ </div>
+ );
 };
 
 export default HRBurnoutRadar;
+
