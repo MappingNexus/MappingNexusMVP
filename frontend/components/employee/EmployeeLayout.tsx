@@ -3,8 +3,9 @@
  */
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Settings, Moon, Sun } from 'lucide-react';
 import type { UserProfile } from '../../types';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface Props {
  user: UserProfile;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 const EmployeeLayout: React.FC<Props> = ({ user, onLogout }) => {
+ const { theme, toggleTheme } = useTheme();
  return (
  <div className="min-h-screen flex flex-col font-sans bg-background text-foreground">
  <header className="h-16 border-b border-border bg-background flex items-center justify-between px-6 sticky top-0 z-50">
@@ -28,6 +30,13 @@ const EmployeeLayout: React.FC<Props> = ({ user, onLogout }) => {
  <div className="w-2 h-2 rounded-full bg-success"></div>
  <span>Session active</span>
  </div>
+ <button
+   onClick={toggleTheme}
+   className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+   title="Toggle theme"
+ >
+   {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+ </button>
  <div className="flex items-center gap-2">
  <div className="w-7 h-7 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-bold">
  {user.email ? user.email.substring(0, 2).toUpperCase() : 'EM'}
@@ -45,7 +54,7 @@ const EmployeeLayout: React.FC<Props> = ({ user, onLogout }) => {
  </header>
 
  <div className="flex flex-1 overflow-hidden">
- <aside className="w-64 border-r border-border bg-sidebar hidden md:flex flex-col">
+ <aside className="w-64 border-r border-border bg-background hidden md:flex flex-col">
  <div className="py-8 flex-1 flex flex-col overflow-y-auto">
  <div className="px-6 mb-6">
  <span className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">NAVIGATION</span>
@@ -62,6 +71,18 @@ const EmployeeLayout: React.FC<Props> = ({ user, onLogout }) => {
  >
  <User className="w-3.5 h-3.5" />
  MY PROFILE
+ </NavLink>
+ <NavLink
+ to="/employee/settings"
+ className={({ isActive }) =>
+ `flex items-center gap-3 px-4 py-2.5 text-xs font-mono uppercase tracking-widest transition-colors rounded-lg ${isActive
+ ? 'bg-background text-foreground font-bold border border-border'
+ : 'border border-transparent text-muted-foreground hover:text-foreground hover:bg-background'
+ }`
+ }
+ >
+ <Settings className="w-3.5 h-3.5" />
+ SETTINGS
  </NavLink>
  </nav>
  </div>

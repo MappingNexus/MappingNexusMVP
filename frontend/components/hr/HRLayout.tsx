@@ -3,8 +3,9 @@
  */
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Activity, FileText, FolderKanban, LogOut, Network, UserCheck, Users, Zap } from 'lucide-react';
+import { Activity, FileText, FolderKanban, LogOut, Network, UserCheck, Users, Zap, Settings, Moon, Sun } from 'lucide-react';
 import type { UserProfile } from '../../types';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface Props {
  user: UserProfile;
@@ -20,7 +21,10 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
  { to: '/hr/burnout', icon: Activity, label: 'BURNOUT RADAR' },
  { to: '/hr/skills', icon: Zap, label: 'SKILL PULSE' },
  { to: '/hr/audit', icon: FileText, label: 'AUDIT LOG' },
+ { to: '/hr/settings', icon: Settings, label: 'SETTINGS' },
  ];
+
+ const { theme, toggleTheme } = useTheme();
 
  return (
  <div className="min-h-screen flex flex-col font-sans bg-background text-foreground">
@@ -38,6 +42,13 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
  <div className="w-2 h-2 rounded-full bg-success"></div>
  <span>Tenant controls active</span>
  </div>
+ <button
+   onClick={toggleTheme}
+   className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+   title="Toggle theme"
+ >
+   {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+ </button>
  <div className="flex items-center gap-2">
  <div className="w-7 h-7 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-bold">
  {user.email ? user.email.substring(0, 2).toUpperCase() : 'HR'}
@@ -55,7 +66,7 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
  </header>
 
  <div className="flex flex-1 overflow-hidden">
- <aside className="w-64 border-r border-border bg-sidebar hidden md:flex flex-col">
+ <aside className="w-64 border-r border-border bg-background hidden md:flex flex-col">
  <div className="py-8 flex-1 flex flex-col overflow-y-auto">
  <div className="px-6 mb-6">
  <span className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">NAVIGATION</span>
