@@ -84,6 +84,29 @@
     --primary-active: 221.8 100% 40%;
     --primary-disabled: 213.3 26.1% 72.9%;
   }
+
+  .dark {
+    --background: 220 13% 4.5%;
+    --foreground: 0 0% 100%;
+
+    --card: 220 12% 9.8%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 220 12% 9.8%;
+    --popover-foreground: 0 0% 100%;
+
+    --secondary: 220 12% 15%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 12% 15%;
+    --muted-foreground: 213.3 26.1% 72.9%;
+
+    --border: 220 12% 15%;
+    --input: 220 12% 15%;
+
+    --sidebar-background: 220 13% 4.5%;
+    --sidebar-foreground: 0 0% 100%;
+  }
 }
 
 @layer base {

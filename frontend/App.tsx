@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import * as api from './services/api';
 import type { UserProfile } from './types';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 // Auth
 import LoginPage from './components/auth/LoginPage';
@@ -29,6 +30,7 @@ import HRBurnoutRadar from './components/hr/HRBurnoutRadar';
 import HRSkillPulse from './components/hr/HRSkillPulse';
 import AuditLog from './components/hr/AuditLog';
 import HRProjects from './components/hr/HRProjects';
+import SettingsPage from './components/shared/SettingsPage';
 
 // Manager pages
 import ManagerLayout from './components/manager/ManagerLayout';
@@ -142,7 +144,8 @@ function App() {
     }
 
     return (
-        <BrowserRouter>
+        <ThemeProvider>
+            <BrowserRouter>
             <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={
@@ -171,6 +174,7 @@ function App() {
                     <Route path="skills" element={<HRSkillPulse />} />
                     <Route path="projects" element={<HRProjects />} />
                     <Route path="audit" element={<AuditLog />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Manager routes */}
@@ -185,6 +189,7 @@ function App() {
                     <Route path="team" element={<TeamManage />} />
                     <Route path="burnout" element={<HRBurnoutRadar />} />
                     <Route path="skills" element={<HRSkillPulse />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Employee routes */}
@@ -195,12 +200,14 @@ function App() {
                 }>
                     <Route index element={<Navigate to="profile" replace />} />
                     <Route path="profile" element={<MyProfile />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Catch-all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
+        </ThemeProvider>
     );
 }
 
