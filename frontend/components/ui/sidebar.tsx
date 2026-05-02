@@ -158,6 +158,8 @@ const Sidebar = React.forwardRef<
           state === "collapsed" && "w-[var(--sidebar-width-icon)]",
           className
         )}
+        data-state={state}
+        data-collapsible={state === "collapsed" ? collapsible : ""}
         ref={ref}
         {...props}
       />

@@ -219,8 +219,8 @@ export function AppSidebar({
                       tooltip={item.title}
                     >
                       <NavLink to={item.url}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
+                        <item.icon className="size-4 shrink-0" />
+                        <span className="group-data-[state=collapsed]/sidebar:hidden truncate">{item.title}</span>
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -240,8 +240,8 @@ export function AppSidebar({
                   tooltip="Logout"
                   className="text-destructive hover:text-destructive"
                 >
-                  <IconLogout className="size-4" />
-                  <span>Logout</span>
+                  <IconLogout className="size-4 shrink-0" />
+                  <span className="group-data-[state=collapsed]/sidebar:hidden truncate">Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
