@@ -101,24 +101,17 @@ const PublicLayout: React.FC<Props> = ({ children, hideHeader = false, navVarian
  </header>
  )}
 
- {/* {hideHeader && (
- <div className="cb-container pt-8">
- <div className="flex items-center justify-between">
- <button type="button" onClick={() => navigate('/')} className="cb-wordmark" aria-label="Go to home">
- <span className="cb-wordmark-accent">Mapping</span>Nexus
+ {hideHeader && (
+ <div className="cb-container pt-4">
+ <div className="flex items-center justify-between ">
+ <button type="button"
+  onClick={() => navigate('/')} className="cb-btn-secondary" aria-label="Go to home">
+ Home
  </button>
- {location.pathname === '/login' ? (
- <Link to="/onboard" className="text-sm font-semibold text-primary hover:opacity-90 transition-opacity">
- Create a workspace
- </Link>
- ) : (
- <Link to="/login" className="text-sm font-semibold text-foreground/80 hover:text-foreground transition-colors">
- Sign in
- </Link>
+
+ </div>
+ </div>
  )}
- </div>
- </div>
- )} */}
 
  {menuOpen && (
  <div className="fixed inset-0 z-[60]">

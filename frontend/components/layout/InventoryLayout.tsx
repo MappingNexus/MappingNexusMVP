@@ -1,19 +1,20 @@
 /**
- * HR Layout — Unified layout with AppSidebar + SharedTopbar
+ * Inventory Layout — Unified layout with AppSidebar + SharedTopbar
+ * Uses the new UI components for inventory management system
  */
 import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/AppSidebar'
 import { SharedTopbar } from '@/components/SharedTopbar'
-import type { UserProfile } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Props {
-  user: UserProfile
   onLogout: () => void
 }
 
-const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
+export function InventoryLayout({ onLogout }: Props) {
+  const { user } = useAuth()
   const [searchValue, setSearchValue] = useState('')
 
   const getInitials = (email: string) => {
@@ -25,29 +26,33 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
       .slice(0, 2)
   }
 
+  const handleLogout = () => {
+    onLogout()
+  }
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
         {/* Sidebar */}
-        <AppSidebar userRole={user?.role} onLogout={onLogout} />
+        <AppSidebar />
 
         {/* Main content area */}
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Topbar */}
           <SharedTopbar
             brandLink="/"
-            brandTitle="NEXUS"
+            brandTitle="INVT"
             showSuperAdminBadge={user?.role === 'admin'}
             showSearch={true}
             searchValue={searchValue}
             onSearchChange={setSearchValue}
             unreadCount={0}
             notificationsLink="/notifications"
-            initials={getInitials(user?.email || 'HR')}
-            userName={user?.name || user?.companyName}
-            userJobTitle={user?.role}
-            profileLink="/hr/settings"
-            onLogout={onLogout}
+            initials={getInitials(user?.email || 'User')}
+            userName={user?.name}
+            userJobTitle={user?.jobTitle}
+            profileLink="/settings"
+            onLogout={handleLogout}
           />
 
           {/* Page content */}
@@ -60,4 +65,4 @@ const HRLayout: React.FC<Props> = ({ user, onLogout }) => {
   )
 }
 
-export default HRLayout
+export default InventoryLayout
