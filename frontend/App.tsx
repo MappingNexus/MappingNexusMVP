@@ -13,6 +13,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import * as api from './services/api';
 import type { UserProfile } from './types';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Auth
 import LoginPage from './components/auth/LoginPage';
@@ -145,7 +146,8 @@ function App() {
 
     return (
         <ThemeProvider>
-            <BrowserRouter>
+            <AuthProvider>
+                <BrowserRouter>
             <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={
@@ -203,10 +205,13 @@ function App() {
                     <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
+                {/* Inventory routes (new layout with AppSidebar + SharedTopbar) */}
+                
                 {/* Catch-all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
+            </AuthProvider>
         </ThemeProvider>
     );
 }

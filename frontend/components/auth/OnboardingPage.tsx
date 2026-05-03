@@ -48,8 +48,8 @@ const OnboardingPage: React.FC = () => {
  <PublicLayout hideHeader>
  <main className="cb-container pt-16 pb-24">
  <div className="max-w-2xl mx-auto">
- <div className="mb-10">
- <div className="cb-caption mb-4">GET STARTED</div>
+ <div className="mb-10 text-center">
+ {/* <div className="cb-caption mb-4">GET STARTED</div> */}
  <h1 className="text-3xl sm:text-4xl font-normal tracking-[-0.02em] leading-tight">
  Create a workspace.
  </h1>
