@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+1.txt
+frontend/DESIGN.md
+seed.js
+frontend/replace_colors.py

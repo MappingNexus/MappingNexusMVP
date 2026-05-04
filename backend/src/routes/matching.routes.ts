@@ -38,6 +38,54 @@ import { validate } from '../utils/validation.js';
 const router = Router();
 const AI_ENHANCEMENT_TIMEOUT_MS = 8000;
 
+// ── Types ─────────────────────────────────────────────────────
+
+/** Shape of a row returned from the employees table (relevant columns). */
+interface CandidateRow {
+    employee_id: string;
+    company_id: string;
+    department: string;
+    seniority_level: string;
+    location: string;
+    travel_eligible: boolean;
+    current_project_load: number;
+    tenure_years: number;
+    availability_from: string | null;
+    cost_per_day_encrypted: string | null;
+    name_encrypted: string;
+    // Injected after fetch:
+    cost_per_day_value?: number | null;
+    availabilityWindows?: AvailabilityWindow[];
+}
+
+interface AvailabilityWindow {
+    employee_id: string;
+    window_type: string;
+    start_date: string;
+    end_date: string;
+}
+
+interface SkillRow {
+    employee_id: string;
+    skill_name: string;
+    proficiency: string;
+    last_used_date: string | null;
+}
+
+interface RequiredSkill {
+    name: string;
+    priority: string;
+}
+
+interface MatchRequirements {
+    skills: RequiredSkill[];
+    seniorityLevel?: string;
+    budgetCeiling?: number;
+    travelRequired?: boolean;
+    startDate?: string;
+    endDate?: string;
+}
+
 function normalizeSkillName(skillName: string): string {
     return skillName.trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -174,10 +222,10 @@ function getCostBand(cost: number | null, averageCost: number | null): CostBand 
  * Calculate rule-based confidence score for an employee against requirements.
  */
 function calculateConfidence(
-    emp: any,
-    empSkills: any[],
-    reqSkills: { name: string; priority: string }[],
-    requirements: any
+    emp: CandidateRow,
+    empSkills: SkillRow[],
+    reqSkills: RequiredSkill[],
+    requirements: MatchRequirements
 ): {
     confidenceScore: number;
     skillMatchScore: number;

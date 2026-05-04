@@ -12,20 +12,6 @@
  *   5. Role check (requireRole)
  *   6. Tenant check (requireTenant)
  */
-/**
- * Mapping Nexus — Main Server (v2 — Neon DB)
- *
- * Express backend using Neon (PostgreSQL) for all DB operations.
- * Custom JWT auth. No Supabase.
- *
- * Middleware stack:
- *   1. CORS
- *   2. JSON body parser
- *   3. Rate limiting (per endpoint category)
- *   4. Auth (JWT verify → Neon DB lookup)
- *   5. Role check (requireRole)
- *   6. Tenant check (requireTenant)
- */
 import express from 'express';
 import cors from 'cors';
 import path from 'path';

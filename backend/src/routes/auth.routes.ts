@@ -626,7 +626,10 @@ router.post('/change-password', authLimiter, requireAuth, validate(changePasswor
 
         const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
         await client.query(
-            'UPDATE public.users SET password_hash = $1 WHERE user_id = $2',
+            `UPDATE public.users
+             SET password_hash = $1,
+                 token_version = token_version + 1
+             WHERE user_id = $2`,
             [newHash, user.userId]
         );
 
@@ -767,13 +770,14 @@ router.post('/reset-password', passwordResetLimiter, validate(resetPasswordSchem
             });
         }
 
-        // All checks passed — update the password
+        // All checks passed — update the password and invalidate all existing tokens
         const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
         await client.query(
             `UPDATE public.users
              SET password_hash = $1,
-                 reset_token_used = true
+                 reset_token_used = true,
+                 token_version = token_version + 1
              WHERE user_id = $2`,
             [newHash, user.user_id]
         );

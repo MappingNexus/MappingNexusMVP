@@ -57,9 +57,10 @@ export const matchingLimiter = rateLimit({
         message: 'Matching engine rate limit reached. Please wait before submitting another query.',
     },
     keyGenerator: (req) => {
-        // Rate limit per authenticated user, not just IP
-        const authHeader = req.headers.authorization || '';
-        return `match-${req.ip}-${authHeader.slice(-20)}`;
+        // Rate limit per authenticated user (userId set by requireAuth, which runs before this).
+        // Fall back to IP if user is somehow not yet attached (shouldn't happen in practice).
+        const userId = (req as any).user?.userId;
+        return userId ? `match-user-${userId}` : `match-ip-${req.ip}`;
     },
 });
 

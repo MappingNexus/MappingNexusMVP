@@ -15,7 +15,7 @@ async function runMigration() {
         console.log('Connecting to Neon DB...');
         const sqlPath = path.resolve('supabase/migrations/neon_master_migration.sql');
         const sql = fs.readFileSync(sqlPath, 'utf8');
-        
+
         console.log('Running migration...');
         await pool.query(sql);
         console.log('? Migration completed successfully!');

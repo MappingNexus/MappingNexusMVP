@@ -12,6 +12,8 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import * as api from './services/api';
 import type { UserProfile } from './types';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Auth
 import LoginPage from './components/auth/LoginPage';
@@ -29,6 +31,7 @@ import HRBurnoutRadar from './components/hr/HRBurnoutRadar';
 import HRSkillPulse from './components/hr/HRSkillPulse';
 import AuditLog from './components/hr/AuditLog';
 import HRProjects from './components/hr/HRProjects';
+import SettingsPage from './components/shared/SettingsPage';
 
 // Manager pages
 import ManagerLayout from './components/manager/ManagerLayout';
@@ -135,14 +138,16 @@ function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0a0a0c] flex items-center justify-center transition-colors duration-500">
+            <div className="min-h-screen bg-background flex items-center justify-center transition-colors duration-500">
                 <LoadingSpinner message="Initializing Mapping Nexus..." />
             </div>
         );
     }
 
     return (
-        <BrowserRouter>
+        <ThemeProvider>
+            <AuthProvider>
+                <BrowserRouter>
             <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={
@@ -171,6 +176,7 @@ function App() {
                     <Route path="skills" element={<HRSkillPulse />} />
                     <Route path="projects" element={<HRProjects />} />
                     <Route path="audit" element={<AuditLog />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Manager routes */}
@@ -185,6 +191,7 @@ function App() {
                     <Route path="team" element={<TeamManage />} />
                     <Route path="burnout" element={<HRBurnoutRadar />} />
                     <Route path="skills" element={<HRSkillPulse />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Employee routes */}
@@ -195,12 +202,17 @@ function App() {
                 }>
                     <Route index element={<Navigate to="profile" replace />} />
                     <Route path="profile" element={<MyProfile />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
+                {/* Inventory routes (new layout with AppSidebar + SharedTopbar) */}
+                
                 {/* Catch-all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
+            </AuthProvider>
+        </ThemeProvider>
     );
 }
 

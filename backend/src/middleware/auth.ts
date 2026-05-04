@@ -12,7 +12,6 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../config/db.js';
 import { env } from '../config/env.js';
 import { logAction } from '../services/audit.service.js';
-import { supabaseAdmin } from '../config/supabase.js';
 
 
 export interface AuthenticatedRequest extends Request {
@@ -40,10 +39,13 @@ function accountStatusMessage(status: string): string {
     }
 }
 
-/** Compatibility hook for callers that previously cleared cached auth profiles. */
-export function clearProfileCache(userId: string) {
-    void userId;
-}
+/**
+ * Compatibility hook — intentional no-op.
+ * If an in-memory profile cache is added in future, call clearance here.
+ * Callers in password-change flows preserve this call so the intent is clear.
+ */
+export function clearProfileCache(_userId: string) { /* no-op — no in-memory cache */ }
+
 
 /**
  * requireAuth — Verifies JWT and attaches user context to req.
@@ -212,10 +214,3 @@ export const requireTenant = (getCompanyIdFromReq: (req: Request) => string | un
     };
 };
 
-/**
- * getSupabaseClient — Returns the shim client for use in route files.
- * In Neon mode, all requests use the same pool (RLS enforced in middleware).
- */
-export function getSupabaseClient(_req: Request): typeof supabaseAdmin {
-    return supabaseAdmin;
-}

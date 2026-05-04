@@ -61,22 +61,22 @@ export interface Employee {
 }
 
 export interface Team {
-    team_id: string;
-    team_name: string;
-    manager_id: string;
-    company_id: string;
-    created_at: string;
+    teamId: string;
+    teamName: string;
+    managerId: string;
+    companyId: string;
+    createdAt: string;
 }
 
 export interface TeamMembership {
-    membership_id: string;
-    team_id: string;
-    employee_id: string;
+    membershipId: string;
+    teamId: string;
+    employeeId: string;
     status: 'pending' | 'approved' | 'rejected';
-    request_reason?: string;
-    review_note?: string;
-    created_at: string;
-    reviewed_at?: string;
+    requestReason?: string;
+    reviewNote?: string;
+    createdAt: string;
+    reviewedAt?: string;
 }
 
 export interface MembershipRequest {
