@@ -69,16 +69,16 @@ const TeamManage: React.FC = () => {
  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
  {teams.map(team => (
  <button
- key={team.team_id}
+ key={team.teamId}
  type="button"
- className={`border p-5 text-left transition-all bg-card ${selectedTeam === team.team_id ? 'border-nexus-green/40' : 'border-border hover:border-foreground/30'}`}
- onClick={() => loadMembers(team.team_id)}
+ className={`border p-5 text-left transition-all bg-card ${selectedTeam === team.teamId ? 'border-nexus-green/40' : 'border-border hover:border-foreground/30'}`}
+ onClick={() => loadMembers(team.teamId)}
  >
  <div className="mb-3 flex items-center justify-between">
- <h3 className="font-bold text-foreground">{team.team_name}</h3>
+ <h3 className="font-bold text-foreground">{team.teamName}</h3>
  <Users className="h-4 w-4 text-nexus-green" />
  </div>
- <p className="text-xs text-muted-foreground font-mono">Created {new Date(team.created_at).toLocaleDateString()}</p>
+ <p className="text-xs text-muted-foreground font-mono">Created {new Date(team.createdAt).toLocaleDateString()}</p>
  </button>
  ))}
  </div>

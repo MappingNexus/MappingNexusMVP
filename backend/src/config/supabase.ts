@@ -351,7 +351,7 @@ class SupabaseShimClient {
                 const userId = (await import('crypto')).default.randomUUID();
                 const bcrypt = await import('bcrypt');
                 const temporaryHash = await bcrypt.hash(params.password || 'TempPassword123!', 12);
-                
+
                 await pool.query(
                     `INSERT INTO public.users (user_id, email, password_hash, company_id, role) VALUES ($1, $2, $3, $4, $5)`,
                     [userId, params.email, temporaryHash, params.user_metadata?.company_id, params.user_metadata?.role || 'employee']

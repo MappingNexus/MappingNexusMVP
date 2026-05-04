@@ -1,16 +1,34 @@
-import type { Request } from 'express';
-import { supabaseAdmin } from '../config/supabase.js';
-import { getSupabaseClient } from './auth.js';
+import type { Request, Response, NextFunction } from 'express';
+import { requireAuth } from './auth.js';
 
-describe('auth middleware helpers', () => {
-    it('returns the Neon compatibility client', () => {
-        // setup
-        const req = {} as Request;
+describe('auth middleware', () => {
+    it('rejects requests with no Authorization header', async () => {
+        const req = { headers: {} } as Request;
+        const res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn(),
+        } as unknown as Response;
+        const next = jest.fn() as NextFunction;
 
-        // action
-        const client = getSupabaseClient(req);
+        await requireAuth(req, res, next);
 
-        // assertion
-        expect(client).toBe(supabaseAdmin);
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(next).not.toHaveBeenCalled();
+    });
+
+    it('rejects requests with a malformed Bearer token', async () => {
+        const req = {
+            headers: { authorization: 'Bearer not-a-valid-jwt' },
+        } as Request;
+        const res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn(),
+        } as unknown as Response;
+        const next = jest.fn() as NextFunction;
+
+        await requireAuth(req, res, next);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(next).not.toHaveBeenCalled();
     });
 });

@@ -109,7 +109,15 @@ router.get('/', requireAuth, requireRole('hr', 'manager'), async (req: Request, 
             return res.status(500).json({ success: false, message: error.message });
         }
 
-        res.json({ success: true, teams: teams || [] });
+        const mapped = (teams || []).map((t: any) => ({
+            teamId: t.team_id,
+            teamName: t.team_name,
+            managerId: t.manager_id,
+            companyId: t.company_id,
+            createdAt: t.created_at,
+        }));
+
+        res.json({ success: true, teams: mapped });
     } catch (err: any) {
         console.error('List teams error:', err.message);
         res.status(500).json({ success: false, message: 'Failed to fetch teams.' });
