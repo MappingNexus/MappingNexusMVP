@@ -6,8 +6,17 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
+<<<<<<< HEAD
     "build": "tsc -p tsconfig.build.json",
+=======
+    "build": "tsc",
+<<<<<<< HEAD
+>>>>>>> manya
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+=======
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "seed-demo": "tsx src/scripts/seed-demo-data.ts",
+>>>>>>> 3a0bc73 (Manager dashboard updates)
     "generate-data": "tsx src/scripts/generate-synthetic-data.ts",
     "backfill-embeddings": "tsx src/scripts/backfill-embeddings.ts",
     "reindex-embeddings": "tsx src/scripts/backfill-embeddings.ts",
