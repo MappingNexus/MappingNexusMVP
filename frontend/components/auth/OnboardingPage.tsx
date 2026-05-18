@@ -8,30 +8,16 @@ const OnboardingPage: React.FC = () => {
     const [companyName, setCompanyName] = useState('');
     const [adminName, setAdminName] = useState('');
     const [adminEmail, setAdminEmail] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [adminPassword, setAdminPassword] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
         setSuccessMessage('');
-
-        if (adminPassword !== confirmPassword) {
-            setError('Passwords do not match.');
-            setLoading(false);
-            return;
-        }
-
-        if (adminPassword.length < 8) {
-            setError('Password must be at least 8 characters.');
-            setLoading(false);
-            return;
-        }
 
         try {
             const response = await api.onboardCompany({ companyName, adminName, adminEmail, adminPassword });
@@ -109,42 +95,6 @@ const OnboardingPage: React.FC = () => {
                                     className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
                                     placeholder="jane.smith@acmecorp.com"
                                     disabled={loading}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Admin Password</label>
-                                <div className="relative">
-                                    <input 
-                                        type={showPassword ? 'text' : 'password'}
-                                        value={adminPassword} 
-                                        onChange={e => setAdminPassword(e.target.value)}
-                                        className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 pr-12 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
-                                        placeholder="Min. 8 characters"
-                                        disabled={loading}
-                                        minLength={8}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                                        tabIndex={-1}
-                                    >
-                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Confirm Password</label>
-                                <input 
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={confirmPassword} 
-                                    onChange={e => setConfirmPassword(e.target.value)}
-                                    className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
-                                    placeholder="Repeat password"
-                                    disabled={loading}
-                                    minLength={8}
                                 />
                             </div>
 

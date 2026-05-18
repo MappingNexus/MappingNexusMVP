@@ -30,11 +30,20 @@ import HRSkillPulse from './components/hr/HRSkillPulse';
 import AuditLog from './components/hr/AuditLog';
 import HRProjects from './components/hr/HRProjects';
 
-// Manager pages
-import ManagerLayout from './components/manager/ManagerLayout';
-import TeamDashboard from './components/manager/TeamDashboard';
+// Manager dashboard pages
+import ManagerDashboardLayout from './components/managerDashboard/ManagerDashboardLayout';
+import ManagerDashboardHome from './components/managerDashboard/pages/ManagerDashboardHome';
+import ManagerTeamManagement from './components/managerDashboard/pages/ManagerTeamManagement';
+import ManagerEmployeeOverview from './components/managerDashboard/pages/ManagerEmployeeOverview';
+import ManagerAttendance from './components/managerDashboard/pages/ManagerAttendance';
+import ManagerTasksAssignments from './components/managerDashboard/pages/ManagerTasksAssignments';
+import ManagerReportsAnalytics from './components/managerDashboard/pages/ManagerReportsAnalytics';
+import ManagerLeaveRequests from './components/managerDashboard/pages/ManagerLeaveRequests';
+import ManagerPerformanceTracking from './components/managerDashboard/pages/ManagerPerformanceTracking';
+import ManagerMessages from './components/managerDashboard/pages/ManagerMessages';
+import ManagerSettings from './components/managerDashboard/pages/ManagerSettings';
+import ManagerProfile from './components/managerDashboard/pages/ManagerProfile';
 import MatchingEngine from './components/manager/MatchingEngine';
-import TeamManage from './components/manager/TeamManage';
 
 // Employee pages
 import EmployeeLayout from './components/employee/EmployeeLayout';
@@ -177,13 +186,22 @@ function App() {
                 {/* Manager routes */}
                 <Route path="/manager" element={
                     <ProtectedRoute user={user} allowedRoles={['manager']}>
-                        <ManagerLayout user={user!} onLogout={handleLogout} />
+                        <ManagerDashboardLayout user={user!} onLogout={handleLogout} />
                     </ProtectedRoute>
                 }>
                     <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<TeamDashboard />} />
+                    <Route path="dashboard" element={<ManagerDashboardHome />} />
+                    <Route path="team" element={<ManagerTeamManagement />} />
+                    <Route path="employees" element={<ManagerEmployeeOverview />} />
+                    <Route path="attendance" element={<ManagerAttendance />} />
+                    <Route path="tasks" element={<ManagerTasksAssignments />} />
+                    <Route path="reports" element={<ManagerReportsAnalytics />} />
+                    <Route path="leave" element={<ManagerLeaveRequests />} />
+                    <Route path="performance" element={<ManagerPerformanceTracking />} />
+                    <Route path="messages" element={<ManagerMessages />} />
+                    <Route path="settings" element={<ManagerSettings />} />
+                    <Route path="profile" element={<ManagerProfile user={user!} />} />
                     <Route path="match" element={<MatchingEngine />} />
-                    <Route path="team" element={<TeamManage />} />
                     <Route path="burnout" element={<HRBurnoutRadar />} />
                     <Route path="skills" element={<HRSkillPulse />} />
                 </Route>
