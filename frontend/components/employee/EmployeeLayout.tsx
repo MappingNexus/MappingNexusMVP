@@ -37,14 +37,14 @@ const EmployeeLayout: React.FC<Props> = ({ user, onLogout }) => {
           <SharedTopbar
             brandLink="/"
             brandTitle="NEXUS"
-            showSuperAdminBadge={user?.role === 'admin'}
+            showSuperAdminBadge={false}
             showSearch={true}
             searchValue={searchValue}
             onSearchChange={setSearchValue}
             unreadCount={0}
             notificationsLink="/notifications"
             initials={getInitials(user?.email || 'EM')}
-            userName={user?.name || user?.companyName}
+            userName={user?.name || user?.companyName || user?.email}
             userJobTitle={user?.role}
             profileLink="/employee/profile"
             onLogout={onLogout}

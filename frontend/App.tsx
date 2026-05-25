@@ -125,9 +125,16 @@ function App() {
         setLoading(false);
     };
 
-    const handleLogin = async (email: string, password: string) => {
+    const handleLogin = async (email: string, password: string, expectedRole?: UserProfile['role']) => {
         const result = await api.login(email, password);
         if (result.success && result.user) {
+            if (expectedRole && result.user.role !== expectedRole) {
+                api.clearSession();
+                return {
+                    success: false,
+                    message: `This account is registered as ${result.user.role}. Choose ${result.user.role.toUpperCase()} or use a ${expectedRole} account.`,
+                };
+            }
             setUser(result.user);
         }
         return result;

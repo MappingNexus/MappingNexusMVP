@@ -1,20 +1,32 @@
 import React, { useState } from 'react';
-import { AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, ArrowRight, BriefcaseBusiness, Building2, CheckCircle2, Eye, EyeOff, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import PublicLayout from '../shared/PublicLayout';
+import type { UserProfile } from '../../types';
+
+type LoginRole = UserProfile['role'];
 
 interface Props {
-    onLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+    onLogin: (email: string, password: string, expectedRole?: LoginRole) => Promise<{ success: boolean; message?: string }>;
     onGoogleLogin: (idToken: string) => Promise<{ success: boolean; message?: string }>;
 }
+
+const roleOptions: Array<{ value: LoginRole; label: string; Icon: typeof Building2 }> = [
+    { value: 'hr', label: 'HR', Icon: Building2 },
+    { value: 'manager', label: 'Manager', Icon: BriefcaseBusiness },
+    { value: 'employee', label: 'Employee', Icon: UserRound },
+];
 
 const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [selectedRole, setSelectedRole] = useState<LoginRole>('hr');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    const isGoogleAuthConfigured = googleClientId && googleClientId !== 'placeholder-client-id';
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -27,7 +39,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
         setLoading(true);
         setError('');
         try {
-            const result = await onLogin(email, password);
+            const result = await onLogin(email, password, selectedRole);
             if (!result.success) setError(result.message || 'Invalid credentials.');
         } catch {
             setError('Connection failed. Is the backend running?');
@@ -68,21 +80,58 @@ const LoginPage: React.FC<Props> = ({ onLogin, onGoogleLogin }) => {
 
                     <div className="cb-card p-8 sm:p-10">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="flex justify-center">
-                                <GoogleLogin
-                                    onSuccess={handleGoogleSuccess}
-                                    onError={() => setError('Google sign-in failed.')}
-                                    useOneTap
-                                    theme="outline"
-                                    shape="pill"
-                                    size="large"
-                                />
-                            </div>
+                            {isGoogleAuthConfigured && (
+                                <>
+                                    <div className="flex justify-center">
+                                        <GoogleLogin
+                                            onSuccess={handleGoogleSuccess}
+                                            onError={() => setError('Google sign-in failed.')}
+                                            useOneTap
+                                            theme="outline"
+                                            shape="pill"
+                                            size="large"
+                                        />
+                                    </div>
 
-                            <div className="relative flex items-center py-2">
-                                <div className="flex-grow border-t border-border"></div>
-                                <span className="flex-shrink-0 mx-4 text-muted-foreground text-sm">or sign in with email</span>
-                                <div className="flex-grow border-t border-border"></div>
+                                    <div className="relative flex items-center py-2">
+                                        <div className="flex-grow border-t border-border"></div>
+                                        <span className="flex-shrink-0 mx-4 text-muted-foreground text-sm">or sign in with email</span>
+                                        <div className="flex-grow border-t border-border"></div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div>
+                                <label className="block text-sm font-semibold text-foreground mb-2">Login as</label>
+                                <div className="grid grid-cols-3 gap-2 rounded-2xl border border-border bg-muted p-1.5">
+                                    {roleOptions.map((role) => {
+                                        const isActive = selectedRole === role.value;
+                                        const { Icon } = role;
+                                        return (
+                                            <button
+                                                key={role.value}
+                                                type="button"
+                                                onClick={() => setSelectedRole(role.value)}
+                                                className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs sm:text-sm font-semibold transition-all ${
+                                                    isActive
+                                                        ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary ring-offset-2 ring-offset-background'
+                                                        : 'border border-transparent text-muted-foreground opacity-70 hover:bg-background hover:text-foreground hover:opacity-100'
+                                                }`}
+                                                disabled={loading}
+                                                aria-pressed={isActive}
+                                            >
+                                                {isActive && (
+                                                    <CheckCircle2 className="absolute right-2 top-2 h-4 w-4" />
+                                                )}
+                                                <Icon className="h-5 w-5" />
+                                                <span>{role.label}</span>
+                                                {isActive && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide opacity-90">Selected</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div>

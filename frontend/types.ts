@@ -7,6 +7,10 @@ export interface UserProfile {
     email: string;
     role: 'hr' | 'manager' | 'employee';
     companyId: string;
+    name?: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
     companyName?: string;
     employeeId?: string;
 }

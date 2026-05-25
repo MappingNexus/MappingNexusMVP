@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as api from '../../services/api';
 import PublicLayout from '../shared/PublicLayout';
