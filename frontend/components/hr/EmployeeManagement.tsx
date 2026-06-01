@@ -3,12 +3,47 @@
  */
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Archive, Search, X, Loader2, Upload, Download, UserPlus } from 'lucide-react';
+import { Plus, Archive, Search, X, Loader2, Upload, Download, FileText } from 'lucide-react';
 import * as api from '../../services/api';
-import type { Employee, EmployeeRequest } from '../../types';
+import type { Employee, EmployeeRequest, Project } from '../../types';
 import LoadingSpinner from '../shared/LoadingSpinner';
 
 const SENIORITY_LEVELS = ['junior', 'mid', 'senior', 'lead', 'principal'];
+const EMPLOYEE_METADATA_KEY = 'mapping_nexus_employee_metadata';
+
+type EmployeeMetadata = {
+ assignedProject?: string;
+ skillsSummary?: string;
+};
+
+function readEmployeeMetadata(): Record<string, EmployeeMetadata> {
+ try {
+ const raw = localStorage.getItem(EMPLOYEE_METADATA_KEY);
+ return raw ? JSON.parse(raw) : {};
+ } catch {
+ return {};
+ }
+}
+
+function saveEmployeeMetadata(employeeId: string, metadata: EmployeeMetadata) {
+ const current = readEmployeeMetadata();
+ localStorage.setItem(EMPLOYEE_METADATA_KEY, JSON.stringify({
+ ...current,
+ [employeeId]: metadata,
+ }));
+}
+
+function fileToBase64(file: File): Promise<string> {
+ return new Promise((resolve, reject) => {
+ const reader = new FileReader();
+ reader.onload = () => {
+ const result = String(reader.result || '');
+ resolve(result.includes(',') ? result.split(',')[1] : result);
+ };
+ reader.onerror = () => reject(new Error('Unable to read CV file.'));
+ reader.readAsDataURL(file);
+ });
+}
 
 const EmployeeManagement: React.FC = () => {
  const [employees, setEmployees] = useState<Employee[]>([]);
@@ -18,10 +53,12 @@ const EmployeeManagement: React.FC = () => {
  const [search, setSearch] = useState('');
  const [deptFilter, setDeptFilter] = useState('');
  const [inviteStatus, setInviteStatus] = useState<{ configured: boolean; message: string } | null>(null);
+ const [employeeMetadata, setEmployeeMetadata] = useState<Record<string, EmployeeMetadata>>({});
  const [searchParams, setSearchParams] = useSearchParams();
  const [requestPrefill, setRequestPrefill] = useState<EmployeeRequest | null>(null);
 
  useEffect(() => {
+ setEmployeeMetadata(readEmployeeMetadata());
  fetchEmployees();
  api.getInviteStatus().then(res => {
  if (res.success) setInviteStatus({ configured: res.configured, message: res.message });
@@ -70,9 +107,6 @@ const EmployeeManagement: React.FC = () => {
  <button onClick={() => { setRequestPrefill(null); setShowAdd(true); }} className="cb-btn-primary">
  <Plus className="w-4 h-4" /> Add employee
  </button>
- <button onClick={() => setShowBulkImport(true)} className="cb-btn-secondary">
- <Upload className="w-4 h-4" /> Bulk import CSV
- </button>
  </div>
  </div>
 
@@ -99,7 +133,7 @@ const EmployeeManagement: React.FC = () => {
  <table className="cb-table">
  <thead>
  <tr>
- {['Name', 'Department', 'Seniority', 'Location', 'Load', 'Performance', 'Actions'].map(h => (
+ {['Name', 'Department', 'Seniority', 'Location', 'Skills', 'CV', 'Assigned Project', 'Load', 'Performance', 'Actions'].map(h => (
  <th key={h}>{h}</th>
  ))}
  </tr>
@@ -114,6 +148,32 @@ const EmployeeManagement: React.FC = () => {
  <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.department}</td>
  <td className="px-5 py-3"><span className="border border-[#9D4EDD]/30 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-[#9D4EDD] bg-[#9D4EDD]/10 capitalize">{emp.seniorityLevel}</span></td>
  <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.location}</td>
+ <td className="px-5 py-3 min-w-[180px]">
+ <div className="flex flex-wrap gap-1.5">
+ {(emp.skills?.length ? emp.skills.map(skill => skill.skill_name || skill.name).filter(Boolean) : (employeeMetadata[emp.employeeId]?.skillsSummary || '').split(',').map(skill => skill.trim()).filter(Boolean)).slice(0, 4).map(skill => (
+ <span key={skill} className="border border-blue-500/30 bg-blue-500/5 px-2 py-1 text-[10px] font-mono uppercase tracking-widest text-blue-500 dark:text-[#00FF66]">{skill}</span>
+ ))}
+ {(!emp.skills?.length && !employeeMetadata[emp.employeeId]?.skillsSummary) && <span className="text-xs text-muted-foreground">No skills</span>}
+ </div>
+ </td>
+ <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">
+ {emp.hasCv ? (
+ <button
+ onClick={async () => {
+ const result = await api.openEmployeeCv(emp.employeeId);
+ if (!result.success) alert(result.message || 'Unable to open CV.');
+ }}
+ title={emp.cvFileName || 'Open CV'}
+ className="inline-flex items-center gap-2 max-w-[180px] text-blue-500 hover:underline"
+ >
+ <FileText className="w-4 h-4 shrink-0" />
+ <span className="truncate">Open CV</span>
+ </button>
+ ) : (
+ <span className="text-xs text-muted-foreground">No CV</span>
+ )}
+ </td>
+ <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{employeeMetadata[emp.employeeId]?.assignedProject || 'Unassigned'}</td>
  <td className="px-5 py-3">
  <span className={`text-sm font-medium font-mono ${emp.currentProjectLoad >= 4 ? 'text-[#FF3333]' : emp.currentProjectLoad >= 2 ? 'text-[#FF9900]' : 'text-blue-500 dark:text-[#00FF66]'}`}>
  {emp.currentProjectLoad}
@@ -128,7 +188,7 @@ const EmployeeManagement: React.FC = () => {
  </tr>
  ))}
  {filtered.length === 0 && (
- <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest">➔ No employees found</td></tr>
+ <tr><td colSpan={10} className="px-5 py-8 text-center text-muted-foreground font-mono text-xs uppercase tracking-widest">No employees found</td></tr>
  )}
  </tbody>
  </table>
@@ -143,7 +203,10 @@ const EmployeeManagement: React.FC = () => {
  setRequestPrefill(null);
  if (searchParams.get('requestId')) setSearchParams({});
  }}
- onCreated={fetchEmployees}
+ onCreated={() => {
+ fetchEmployees();
+ setEmployeeMetadata(readEmployeeMetadata());
+ }}
  />}
 
  {/* Bulk Import Modal */}
@@ -163,7 +226,10 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  costPerDay: '',
  travelEligible: false,
  skills: (prefillRequest?.skillsRequired || []).map(skill => skill.skill_name).join(', '),
+ assignedProject: '',
  });
+ const [cvFile, setCvFile] = useState<File | null>(null);
+ const [projects, setProjects] = useState<Project[]>([]);
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState('');
  const [result, setResult] = useState<any>(null);
@@ -171,11 +237,30 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  const [resendMessage, setResendMessage] = useState('');
  const isManager = form.role === 'manager';
 
+ useEffect(() => {
+ api.getProjects().then(res => {
+ if (res.success) setProjects(res.projects || []);
+ }).catch(() => {});
+ }, []);
+
  const handleSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
  if (!form.name || !form.workEmail || !form.department) { setError('Name, email, and department are required.'); return; }
  setLoading(true); setError('');
  const skills = form.skills.split(',').map(s => s.trim()).filter(Boolean).map(name => ({ name, proficiency: 'intermediate' }));
+ let cvPayload: { cvFileName?: string; cvMimeType?: string; cvDataBase64?: string } = {};
+ if (cvFile) {
+ if (cvFile.size > 5 * 1024 * 1024) {
+ setLoading(false);
+ setError('CV file must be 5MB or smaller.');
+ return;
+ }
+ cvPayload = {
+ cvFileName: cvFile.name,
+ cvMimeType: cvFile.type || 'application/octet-stream',
+ cvDataBase64: await fileToBase64(cvFile),
+ };
+ }
  const res = await api.createEmployee({
  name: form.name, workEmail: form.workEmail, department: form.department,
  seniorityLevel: form.seniorityLevel, location: form.location,
@@ -184,31 +269,57 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  skills,
  role: form.role,
  requestId: prefillRequest?.requestId,
+ ...cvPayload,
  });
+ if (res.success) {
+ const employeeId = res.employee?.employeeId;
+ if (employeeId) {
+ saveEmployeeMetadata(employeeId, {
+ assignedProject: form.assignedProject,
+ skillsSummary: form.skills,
+ });
+ if (cvFile && cvPayload.cvFileName && cvPayload.cvMimeType && cvPayload.cvDataBase64 && !res.employee?.hasCv) {
+ const cvRes = await api.uploadEmployeeCv(employeeId, {
+ cvFileName: cvPayload.cvFileName,
+ cvMimeType: cvPayload.cvMimeType,
+ cvDataBase64: cvPayload.cvDataBase64,
+ });
+ if (!cvRes.success) {
+ setError(cvRes.message || 'Employee created, but CV could not be saved.');
  setLoading(false);
- if (res.success) { setResult(res); onCreated(); }
- else setError(res.message || 'Failed to create employee.');
+ return;
+ }
+ }
+ }
+ setLoading(false);
+ setResult(res);
+ onCreated();
+ }
+ else {
+ setLoading(false);
+ setError(res.message || 'Failed to create employee.');
+ }
  };
 
  return (
- <div className="fixed inset-0 bg-card flex items-center justify-center z-50 p-4">
- <div className="border border-border bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto">
- <div className="bg-gray-50 flex items-center gap-2 px-4 py-3 border-b border-border dark:border-white/10">
+ <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+ <div className="border border-white/15 bg-[#0b0d10] text-white w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-3xl shadow-2xl">
+ <div className="sticky top-0 z-10 bg-[#12151a] flex items-center gap-2 px-4 py-3 border-b border-white/10">
  <div className="w-3 h-3 rounded-full bg-[#FF3333]"></div>
  <div className="w-3 h-3 rounded-full bg-[#FF9900]"></div>
  <div className="w-3 h-3 rounded-full bg-[#00FF66]"></div>
- <span className="ml-4 font-mono text-[10px] text-muted-foreground tracking-wider uppercase">~/nexus/action</span>
+ <span className="ml-4 font-mono text-[10px] text-white/50 tracking-wider uppercase">~/nexus/action</span>
  </div>
  <div className="p-6">
  <div className="flex items-center justify-between mb-6">
- <h2 className="text-lg font-black text-foreground uppercase tracking-tight">Add Employee</h2>
- <button onClick={onClose} className="text-gray-500 hover:text-gray-900 transition-colors"><X className="w-5 h-5" /></button>
+ <h2 className="text-lg font-black text-white uppercase tracking-tight">Add Employee</h2>
+ <button onClick={onClose} className="text-white/60 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
  </div>
 
  {result ? (
  <div className="text-center py-6">
  <div className="w-12 h-12 bg-[#00FF66]/10 border border-blue-500 flex items-center justify-center mx-auto mb-3 text-2xl">✅</div>
- <h3 className="text-gray-900 font-black uppercase">{isManager ? 'Manager' : 'Employee'} Created!</h3>
+ <h3 className="text-foreground font-black uppercase">{isManager ? 'Manager' : 'Employee'} Created!</h3>
  <p className="text-gray-500 font-mono text-xs mt-2">ID: {result.employee?.displayId || result.user?.id || '—'}</p>
  {result.onboarding?.message && <p className="text-[#9D4EDD] font-mono text-xs mt-2">{result.onboarding.message}</p>}
  {resendMessage && <p className="text-gray-500 font-mono text-xs mt-2">{resendMessage}</p>}
@@ -227,7 +338,7 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  {resendLoading ? 'Resending Invite...' : 'Resend Invite Email'}
  </button>
  )}
- <button onClick={onClose} className="mt-4 bg-white text-black font-bold uppercase tracking-widest text-xs px-6 py-2 hover:opacity-90 transition-colors">Done</button>
+ <button onClick={onClose} className="mt-4 bg-blue-600 text-white font-bold uppercase tracking-widest text-xs px-6 py-2 hover:bg-blue-500 transition-colors">Done</button>
  </div>
  ) : (
  <form onSubmit={handleSubmit} className="space-y-4">
@@ -239,64 +350,88 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  </div>
  )}
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Role *</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Role *</label>
  <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value as 'employee' | 'manager' })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors">
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors">
  <option value="employee">Employee</option>
  <option value="manager">Manager</option>
  </select>
  </div>
- <div className="grid grid-cols-2 gap-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Full Name *</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Full Name *</label>
  <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors" />
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
  </div>
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Work Email *</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Work Email *</label>
  <input type="email" value={form.workEmail} onChange={e => setForm({ ...form, workEmail: e.target.value })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors" />
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
  </div>
  </div>
- <div className="grid grid-cols-2 gap-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Department *</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Department *</label>
  <input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors" />
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
  </div>
  {!isManager && (
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Seniority</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Seniority</label>
  <select value={form.seniorityLevel} onChange={e => setForm({ ...form, seniorityLevel: e.target.value })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors">
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors">
  {SENIORITY_LEVELS.map(s => <option key={s} value={s}>{s}</option>)}
  </select>
  </div>
  )}
  </div>
- <div className="grid grid-cols-2 gap-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Location</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Location</label>
  <input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors" />
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
  </div>
  {!isManager && (
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Cost/Day (₹)</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Cost/Day (₹)</label>
  <input type="number" value={form.costPerDay} onChange={e => setForm({ ...form, costPerDay: e.target.value })}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors" />
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors" />
  </div>
  )}
  </div>
  {!isManager && (
  <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Skills (comma-separated)</label>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Skills (comma-separated)</label>
  <input value={form.skills} onChange={e => setForm({ ...form, skills: e.target.value })} placeholder="React, Python, AWS..."
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm outline-none focus:border-primary transition-colors" />
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white placeholder:text-white/35 text-sm outline-none focus:border-blue-500 transition-colors" />
  </div>
  )}
  {!isManager && (
- <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">CV / Resume</label>
+ <input
+ type="file"
+ accept=".pdf,.doc,.docx"
+ onChange={e => setCvFile(e.target.files?.[0] || null)}
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm file:mr-3 file:py-1 file:px-3 file:border-0 file:bg-blue-600 file:text-white file:text-xs file:cursor-pointer file:uppercase file:tracking-widest"
+ />
+ {cvFile && <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-white/60">{cvFile.name}</p>}
+ </div>
+ <div>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Assign Project</label>
+ <select value={form.assignedProject} onChange={e => setForm({ ...form, assignedProject: e.target.value })}
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors">
+ <option value="">Unassigned</option>
+ {projects.map(project => (
+ <option key={project.project_id} value={project.project_name}>{project.project_name}</option>
+ ))}
+ </select>
+ </div>
+ </div>
+ )}
+ {!isManager && (
+ <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
  <input type="checkbox" checked={form.travelEligible} onChange={() => setForm({ ...form, travelEligible: !form.travelEligible })} className="w-4 h-4" />
  Travel eligible
  </label>
@@ -307,7 +442,7 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  </div>
  )}
  <button type="submit" disabled={loading}
- className="w-full bg-white text-black font-bold uppercase tracking-widest text-xs py-2.5 hover:opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+ className="sticky bottom-0 w-full bg-blue-600 text-white font-bold uppercase tracking-widest text-xs py-3 hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Provisioning...</> : isManager ? 'Create Manager & Send Invite' : 'Create Employee & Send Invite'}
  </button>
  </form>
@@ -413,7 +548,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
  </tbody>
  </table>
  </div>
- <button onClick={onClose} className="w-full bg-white text-black font-bold uppercase tracking-widest text-xs py-2.5 hover:opacity-90 transition-colors">Done</button>
+ <button onClick={onClose} className="sticky bottom-0 w-full bg-primary text-primary-foreground font-bold uppercase tracking-widest text-xs py-3 hover:opacity-90 transition-colors">Done</button>
  </div>
  ) : (
  <div className="space-y-4">
@@ -435,13 +570,13 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
  <div>
  <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Upload CSV</label>
  <input ref={fileRef} type="file" accept=".csv" onChange={handleFile}
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm file:mr-3 file:py-1 file:px-3 file:border-0 file:bg-white/80 file:text-gray-900 file:text-xs file:cursor-pointer file:uppercase file:tracking-widest" />
+ className="w-full bg-background border border-border px-3 py-2.5 text-foreground text-sm file:mr-3 file:py-1 file:px-3 file:border-0 file:bg-primary file:text-primary-foreground file:text-xs file:cursor-pointer file:uppercase file:tracking-widest" />
  </div>
 
  <div>
  <label className="block font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Or paste CSV content</label>
  <textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={6} placeholder="name,email,department,seniority,..."
- className="w-full bg-transparent border border-border px-3 py-2.5 text-foreground text-sm font-mono outline-none focus:border-primary transition-colors resize-none" />
+ className="w-full bg-background border border-border px-3 py-2.5 text-foreground text-sm font-mono outline-none focus:border-primary transition-colors resize-none" />
  </div>
 
  {csvText && (
@@ -457,7 +592,7 @@ function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () 
  )}
 
  <button onClick={handleSubmit} disabled={loading}
- className="w-full bg-white text-black font-bold uppercase tracking-widest text-xs py-2.5 hover:opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+ className="sticky bottom-0 w-full bg-primary text-primary-foreground font-bold uppercase tracking-widest text-xs py-3 hover:opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Importing...</> : <><Upload className="w-4 h-4" /> Import CSV</>}
  </button>
  </div>

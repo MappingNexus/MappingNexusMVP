@@ -346,21 +346,28 @@ class SupabaseShimClient {
     auth = {
         admin: {
             createUser: async (params: any) => {
-                // In Neon mode, user creation is done via auth.routes.ts /invite-user
-                // This stub correctly populates public.users for backward compat during migration.
-                const userId = (await import('crypto')).default.randomUUID();
-                const bcrypt = await import('bcrypt');
-                const temporaryHash = await bcrypt.hash(params.password || 'TempPassword123!', 12);
+                try {
+                    // In Neon mode, this stub populates public.users for backward compatibility.
+                    const userId = (await import('crypto')).default.randomUUID();
+                    const bcrypt = await import('bcrypt');
+                    const temporaryHash = await bcrypt.hash(params.password || 'TempPassword123!', 12);
+                    const email = String(params.email || '').toLowerCase().trim();
 
-                await pool.query(
-                    `INSERT INTO public.users (user_id, email, password_hash, company_id, role) VALUES ($1, $2, $3, $4, $5)`,
-                    [userId, params.email, temporaryHash, params.user_metadata?.company_id, params.user_metadata?.role || 'employee']
-                );
+                    await pool.query(
+                        `INSERT INTO public.users (user_id, email, password_hash, company_id, role) VALUES ($1, $2, $3, $4, $5)`,
+                        [userId, email, temporaryHash, params.user_metadata?.company_id, params.user_metadata?.role || 'employee']
+                    );
 
-                return {
-                    data: { user: { id: userId, email: params.email } },
-                    error: null,
-                };
+                    return {
+                        data: { user: { id: userId, email } },
+                        error: null,
+                    };
+                } catch (err: any) {
+                    const message = err?.code === '23505'
+                        ? 'A user with this email already exists.'
+                        : err?.message || 'Failed to create user.';
+                    return { data: null, error: { message } };
+                }
             },
             deleteUser: async (_userId: string) => ({ error: null }),
             getUserById: async (userId: string) => {

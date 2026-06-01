@@ -60,6 +60,9 @@ export interface Employee {
     tenureYears: number;
     isArchived: boolean;
     skills: Skill[];
+    hasCv?: boolean;
+    cvFileName?: string | null;
+    cvUploadedAt?: string | null;
     createdAt?: string;
     updatedAt?: string;
 }

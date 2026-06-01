@@ -101,3 +101,27 @@ export const messageThreads = [
 ];
 
 export const chartBars = [72, 88, 64, 91, 76, 84, 69, 95];
+
+export const liveProjects = [
+    {
+        name: 'Atlas Capacity Rebalance',
+        owner: 'Arjun Manager',
+        status: 'Active',
+        discussionProgress: 78,
+        workProgress: 46,
+    },
+    {
+        name: 'Customer Migration Wave',
+        owner: 'Meera Manager',
+        status: 'Planning',
+        discussionProgress: 62,
+        workProgress: 24,
+    },
+    {
+        name: 'Security Audit Readiness',
+        owner: 'Vikram Manager',
+        status: 'At Risk',
+        discussionProgress: 88,
+        workProgress: 57,
+    },
+];

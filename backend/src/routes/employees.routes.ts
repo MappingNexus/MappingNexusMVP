@@ -36,6 +36,12 @@ const MAX_EMAIL_LENGTH = 160;
 const MAX_DEPARTMENT_LENGTH = 120;
 const MAX_SKILLS_PER_EMPLOYEE = 25;
 const MAX_SKILL_NAME_LENGTH = 80;
+const MAX_CV_BYTES = 5 * 1024 * 1024;
+const ALLOWED_CV_MIME_TYPES = new Set([
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
 const ALLOWED_PROFICIENCIES = new Set(['beginner', 'intermediate', 'expert']);
 const availabilityWindowSchema = z.object({
     availabilityWindowId: z.string().uuid().optional(),
@@ -64,6 +70,9 @@ const createEmployeeSchema = z.object({
     tenureYears: z.coerce.number().min(0).max(50).optional().nullable(),
     role: z.enum(['employee', 'manager']).optional(),
     requestId: z.string().uuid().optional(),
+    cvFileName: z.string().trim().min(1).max(180).optional(),
+    cvMimeType: z.string().trim().max(120).optional(),
+    cvDataBase64: z.string().optional(),
 });
 
 const updateEmployeeSchema = z.object({
@@ -248,6 +257,57 @@ function validateAndNormalizeSkills(skills: any[]): {
     return { valid: true, normalizedSkills };
 }
 
+function validateCvPayload(payload: { cvFileName?: string; cvMimeType?: string; cvDataBase64?: string }) {
+    const { cvFileName, cvMimeType, cvDataBase64 } = payload;
+    if (!cvFileName && !cvMimeType && !cvDataBase64) return { valid: true };
+    if (!cvFileName || !cvMimeType || !cvDataBase64) {
+        return { valid: false, message: 'CV file name, MIME type, and file data are required together.' };
+    }
+    if (!ALLOWED_CV_MIME_TYPES.has(cvMimeType)) {
+        return { valid: false, message: 'CV must be a PDF, DOC, or DOCX file.' };
+    }
+    let size = 0;
+    try {
+        size = Buffer.from(cvDataBase64, 'base64').byteLength;
+    } catch {
+        return { valid: false, message: 'Invalid CV file data.' };
+    }
+    if (size <= 0 || size > MAX_CV_BYTES) {
+        return { valid: false, message: 'CV file must be 5MB or smaller.' };
+    }
+    return { valid: true };
+}
+
+async function upsertEmployeeCv(params: {
+    employeeId: string;
+    companyId: string;
+    uploadedBy: string;
+    cvFileName: string;
+    cvMimeType: string;
+    cvDataBase64: string;
+}) {
+    await pool.query(
+        `INSERT INTO public.employee_cvs (
+            employee_id, company_id, file_name, mime_type, file_data_base64, uploaded_by, uploaded_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, now())
+         ON CONFLICT (employee_id) DO UPDATE SET
+            file_name = EXCLUDED.file_name,
+            mime_type = EXCLUDED.mime_type,
+            file_data_base64 = EXCLUDED.file_data_base64,
+            uploaded_by = EXCLUDED.uploaded_by,
+            uploaded_at = now()`,
+        [
+            params.employeeId,
+            params.companyId,
+            params.cvFileName,
+            params.cvMimeType,
+            params.cvDataBase64,
+            params.uploadedBy,
+        ]
+    );
+}
+
 /**
  * Decrypt employee record for API response.
  * Strips cost_per_day for managers (they see range instead).
@@ -281,6 +341,12 @@ async function formatEmployeeResponse(
         .eq('company_id', companyId)
         .order('start_date', { ascending: true });
 
+    const cvResult = await pool.query(
+        'SELECT file_name, uploaded_at FROM public.employee_cvs WHERE employee_id = $1 AND company_id = $2',
+        [emp.employee_id, companyId]
+    );
+    const cv = cvResult.rows[0];
+
     const displayId = hashForDisplay(emp.employee_id);
 
     const response: any = {
@@ -300,6 +366,9 @@ async function formatEmployeeResponse(
         tenureYears: emp.tenure_years,
         isArchived: emp.is_archived,
         skills: skills || [],
+        hasCv: Boolean(cv),
+        cvFileName: cv?.file_name || null,
+        cvUploadedAt: cv?.uploaded_at || null,
         availabilityWindows: (windows || []).map(window => ({
             availabilityWindowId: window.availability_window_id,
             windowType: window.window_type,
@@ -350,6 +419,7 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
             name, workEmail, department, seniorityLevel, costPerDay,
             location, travelEligible, skills, performanceScore,
             availabilityFrom, availabilityTo, availabilityWindows, tenureYears, role: targetRole, requestId,
+            cvFileName, cvMimeType, cvDataBase64,
         } = req.body;
 
         if (!name || !workEmail || !department) {
@@ -389,6 +459,10 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
         }
 
         const assignRole: 'employee' | 'manager' = targetRole === 'manager' ? 'manager' : 'employee';
+        const cvValidation = validateCvPayload({ cvFileName, cvMimeType, cvDataBase64 });
+        if (!cvValidation.valid) {
+            return res.status(400).json({ success: false, message: cvValidation.message });
+        }
 
         // 1. Generate temp password
         const tempPassword = generateTempPassword();
@@ -505,6 +579,17 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
         }
 
         await syncAvailabilityWindows(db, employee.employee_id, user.companyId, user.userId, availabilityWindows);
+
+        if (cvFileName && cvMimeType && cvDataBase64) {
+            await upsertEmployeeCv({
+                employeeId: employee.employee_id,
+                companyId: user.companyId,
+                uploadedBy: user.userId,
+                cvFileName,
+                cvMimeType,
+                cvDataBase64,
+            });
+        }
 
         if (requestId) {
             await db
@@ -746,6 +831,88 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('Get employee error:', err.message);
         res.status(500).json({ success: false, message: 'Failed to fetch employee.' });
+    }
+});
+
+/**
+ * GET /api/employees/:id/cv
+ * HR and managers can open CVs for employees in their company.
+ */
+router.get('/:id/cv', requireAuth, requireRole('hr', 'manager'), async (req: Request, res: Response) => {
+    try {
+        const user = (req as AuthenticatedRequest).user;
+        const { id } = req.params;
+
+        const employee = await pool.query(
+            'SELECT employee_id FROM public.employees WHERE employee_id = $1 AND company_id = $2 AND is_archived = false',
+            [id, user.companyId]
+        );
+        if (employee.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Employee not found.' });
+        }
+
+        const cv = await pool.query(
+            `SELECT file_name, mime_type, file_data_base64
+             FROM public.employee_cvs
+             WHERE employee_id = $1 AND company_id = $2`,
+            [id, user.companyId]
+        );
+        if (cv.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'CV not uploaded.' });
+        }
+
+        const row = cv.rows[0];
+        const fileBuffer = Buffer.from(row.file_data_base64, 'base64');
+        res.setHeader('Content-Type', row.mime_type);
+        res.setHeader('Content-Disposition', `inline; filename="${String(row.file_name).replace(/"/g, '')}"`);
+        res.send(fileBuffer);
+    } catch (err: any) {
+        console.error('Get employee CV error:', err.message);
+        res.status(500).json({ success: false, message: 'Failed to open CV.' });
+    }
+});
+
+/**
+ * POST /api/employees/:id/cv
+ * HR uploads or replaces an employee CV.
+ */
+router.post('/:id/cv', requireAuth, requireRole('hr'), async (req: Request, res: Response) => {
+    try {
+        const user = (req as AuthenticatedRequest).user;
+        const { id } = req.params;
+        const { cvFileName, cvMimeType, cvDataBase64 } = req.body;
+
+        const cvValidation = validateCvPayload({ cvFileName, cvMimeType, cvDataBase64 });
+        if (!cvValidation.valid) {
+            return res.status(400).json({ success: false, message: cvValidation.message });
+        }
+
+        const employee = await pool.query(
+            'SELECT employee_id FROM public.employees WHERE employee_id = $1 AND company_id = $2 AND is_archived = false',
+            [id, user.companyId]
+        );
+        if (employee.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Employee not found.' });
+        }
+
+        await upsertEmployeeCv({
+            employeeId: id,
+            companyId: user.companyId,
+            uploadedBy: user.userId,
+            cvFileName,
+            cvMimeType,
+            cvDataBase64,
+        });
+
+        res.json({
+            success: true,
+            cv: {
+                fileName: cvFileName,
+            },
+        });
+    } catch (err: any) {
+        console.error('Upload employee CV error:', err.message);
+        res.status(500).json({ success: false, message: 'Failed to upload CV.' });
     }
 });
 

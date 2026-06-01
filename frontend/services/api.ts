@@ -333,8 +333,38 @@ export async function createEmployee(data: {
     performanceScore?: number; tenureYears?: number; role?: 'employee' | 'manager';
     availabilityWindows?: { windowType: string; startDate: string; endDate: string; note?: string }[];
     requestId?: string;
+    cvFileName?: string;
+    cvMimeType?: string;
+    cvDataBase64?: string;
 }) {
     return request('/api/employees', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function openEmployeeCv(employeeId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+        const response = await fetchWithTimeout(`${API}/api/employees/${employeeId}/cv`);
+        if (!response.ok) {
+            return { success: false, message: response.status === 404 ? 'CV not uploaded.' : 'Unable to open CV.' };
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return { success: true };
+    } catch {
+        return { success: false, message: 'Unable to open CV.' };
+    }
+}
+
+export async function uploadEmployeeCv(employeeId: string, data: {
+    cvFileName: string;
+    cvMimeType: string;
+    cvDataBase64: string;
+}) {
+    return request<{ success: boolean; message?: string; cv?: { fileName: string } }>(
+        `/api/employees/${employeeId}/cv`,
+        { method: 'POST', body: JSON.stringify(data) }
+    );
 }
 
 export async function bulkImportEmployees(csv: string, role: 'employee' | 'manager' = 'employee') {

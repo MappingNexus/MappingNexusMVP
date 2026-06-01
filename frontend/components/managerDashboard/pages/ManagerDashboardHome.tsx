@@ -1,7 +1,23 @@
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
-import { chartBars, managerMetrics, notifications, recentActivity, teamMembers } from '../managerDashboardData';
+import { chartBars, liveProjects, managerMetrics, notifications, recentActivity, teamMembers } from '../managerDashboardData';
 import { LoadBar, MetricCard, MiniBarChart, Panel, SectionHeader, StatusPill } from '../ManagerDashboardWidgets';
+
+function ProgressBar({ label, value, tone }: { label: string; value: number; tone: 'discussion' | 'work' }) {
+    const color = tone === 'discussion' ? '#9D4EDD' : '#00FF66';
+
+    return (
+        <div>
+            <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest mb-1.5">
+                <span className="text-gray-500 dark:text-[#8a8a8a]">{label}</span>
+                <span style={{ color }}>{value}%</span>
+            </div>
+            <div className="h-2 border border-gray-200 dark:border-white/10 bg-white/30 dark:bg-black/20">
+                <div className="h-full transition-all duration-500" style={{ width: `${value}%`, backgroundColor: color }} />
+            </div>
+        </div>
+    );
+}
 
 const ManagerDashboardHome: React.FC = () => {
     const currentTimestamp = new Date().toLocaleString();
@@ -53,6 +69,27 @@ const ManagerDashboardHome: React.FC = () => {
                     </div>
                 </Panel>
             </div>
+
+            <Panel>
+                <SectionHeader eyebrow="PROJECT.PIPELINE" title="Live Projects" meta={`${liveProjects.length} TRACKED`} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {liveProjects.map(project => (
+                        <div key={project.name} className="border border-gray-200 dark:border-white/10 p-5 bg-white/30 dark:bg-black/20">
+                            <div className="flex items-start justify-between gap-4 mb-5">
+                                <div className="min-w-0">
+                                    <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight truncate">{project.name}</p>
+                                    <p className="text-[10px] font-mono uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a] mt-1">OWNER / {project.owner}</p>
+                                </div>
+                                <StatusPill label={project.status} tone={project.status === 'At Risk' ? 'yellow' : 'green'} />
+                            </div>
+                            <div className="space-y-4">
+                                <ProgressBar label="Discussion done" value={project.discussionProgress} tone="discussion" />
+                                <ProgressBar label="Work done" value={project.workProgress} tone="work" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Panel>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <Panel>
