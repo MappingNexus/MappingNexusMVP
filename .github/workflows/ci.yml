@@ -40,9 +40,10 @@ jobs:
       - name: Run Jest Test Suite
         env:
           NODE_ENV: test
-          # You can define fake env variables for the tests here if needed
+          DATABASE_URL: "postgres://ci-user:ci-pass@localhost:5432/ci"
           JWT_SECRET: "ci-test-secret"
-          ENCRYPTION_KEK: "deadbeefcafebabedeadbeefcafebabedeadbeefcafebabedeadbeefcafebabe"
+          OPENROUTER_API_KEY: "sk-or-ci-placeholder"
+          ENCRYPTION_KEK: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         run: npm test
 
   frontend-ci:

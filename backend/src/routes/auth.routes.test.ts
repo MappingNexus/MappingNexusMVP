@@ -298,6 +298,14 @@ class FakeDb {
             return result([], 1);
         }
 
+        if (normalized.startsWith('update public.users set password_hash = $1, token_version = token_version + 1')) {
+            const user = this.users.get(params[1]);
+            if (!user) return result([], 0);
+            user.password_hash = params[0];
+            user.token_version += 1;
+            return result([], 1);
+        }
+
         if (normalized.startsWith('update public.users set password_hash = $1 where user_id = $2')) {
             const user = this.users.get(params[1]);
             if (!user) return result([], 0);
