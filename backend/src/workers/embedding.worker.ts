@@ -4,7 +4,7 @@ import { pool } from '../config/db.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-export const embeddingWorker = new Worker('embedding-queue', async (job: Job) => {
+export const embeddingWorker = redisConnection ? new Worker('embedding-queue', async (job: Job) => {
     const { employeeId, skillsText } = job.data;
 
     if (!OPENROUTER_API_KEY) {
@@ -52,8 +52,8 @@ export const embeddingWorker = new Worker('embedding-queue', async (job: Job) =>
 
     console.log(`[Worker] Job ${job.id} completed. DB updated for employee ${employeeId}.`);
 
-}, { connection: redisConnection });
+}, { connection: redisConnection }) : null;
 
-embeddingWorker.on('failed', (job, err) => {
+embeddingWorker?.on('failed', (job, err) => {
     console.error(`[Worker] Job ${job?.id} failed: ${err.message}`);
 });

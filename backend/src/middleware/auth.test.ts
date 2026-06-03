@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { requireAuth } from './auth.js';
 
