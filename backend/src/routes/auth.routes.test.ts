@@ -253,7 +253,7 @@ class FakeDb {
         }
 
         if (normalized.startsWith('insert into public.users')) {
-            const role = params[4] || 'hr';
+            const role = params[4];
             const user: TestUser = {
                 user_id: params[0],
                 email: params[1],
@@ -461,6 +461,7 @@ describe('complete auth system', () => {
                 companyName: 'Acme Corp',
                 adminName: 'Ada Admin',
                 adminEmail: 'Ada.Admin@Example.com',
+                adminRole: 'hr',
                 adminPassword: 'StrongPass123',
             };
 
@@ -481,6 +482,28 @@ describe('complete auth system', () => {
             const admin = db.findUserByEmail('ada.admin@example.com');
             expect(admin).toMatchObject({ role: 'hr', status: 'active', token_version: 0 });
             await expect(bcrypt.compare(payload.adminPassword, admin!.password_hash)).resolves.toBe(true);
+        });
+
+        it('persists the selected manager role during onboarding', async () => {
+            // setup
+            const payload = {
+                companyName: 'Manager Co',
+                adminName: 'Morgan Manager',
+                adminEmail: 'Morgan.Manager@Example.com',
+                adminRole: 'manager',
+                adminPassword: 'StrongPass123',
+            };
+
+            // action
+            const response = await request(app)
+                .post('/api/auth/onboard-company')
+                .send(payload);
+
+            // assertion
+            expect(response.status).toBe(201);
+            const manager = db.findUserByEmail('morgan.manager@example.com');
+            expect(manager).toMatchObject({ role: 'manager', status: 'active', token_version: 0 });
+            await expect(bcrypt.compare(payload.adminPassword, manager!.password_hash)).resolves.toBe(true);
         });
 
         it('returns 400 when required onboarding fields are missing', async () => {
@@ -510,6 +533,7 @@ describe('complete auth system', () => {
                     companyName: 'Duplicate Co',
                     adminName: 'Ada Admin',
                     adminEmail: 'ADMIN@example.com',
+                    adminRole: 'hr',
                     adminPassword: 'StrongPass123',
                 });
 

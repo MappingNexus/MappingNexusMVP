@@ -36,7 +36,7 @@ COMMENT ON COLUMN public.companies.company_name IS 'Stored encrypted. Decrypted 
 CREATE TABLE IF NOT EXISTS public.users (
     user_id       uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     company_id    uuid NOT NULL REFERENCES public.companies(company_id) ON DELETE RESTRICT,
-    role          user_role NOT NULL DEFAULT 'employee',
+    role          user_role NOT NULL,
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 

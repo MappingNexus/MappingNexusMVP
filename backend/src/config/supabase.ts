@@ -352,10 +352,15 @@ class SupabaseShimClient {
                     const bcrypt = await import('bcrypt');
                     const temporaryHash = await bcrypt.hash(params.password || 'TempPassword123!', 12);
                     const email = String(params.email || '').toLowerCase().trim();
+                    const role = params.user_metadata?.role;
+
+                    if (!['hr', 'manager', 'employee'].includes(role)) {
+                        return { data: null, error: { message: 'A valid user role is required.' } };
+                    }
 
                     await pool.query(
                         `INSERT INTO public.users (user_id, email, password_hash, company_id, role) VALUES ($1, $2, $3, $4, $5)`,
-                        [userId, email, temporaryHash, params.user_metadata?.company_id, params.user_metadata?.role || 'employee']
+                        [userId, email, temporaryHash, params.user_metadata?.company_id, role]
                     );
 
                     return {

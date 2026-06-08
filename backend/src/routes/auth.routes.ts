@@ -472,6 +472,7 @@ const onboardSchema = z.object({
     companyName: z.string().trim().min(1, 'Company name is required.').max(200),
     adminName: z.string().trim().min(1, 'Admin name is required.').max(200),
     adminEmail: z.string().trim().email('Invalid email format.'),
+    adminRole: z.enum(['hr', 'manager', 'employee']),
     adminPassword: z
         .string()
         .min(8, 'Password must be at least 8 characters.')
@@ -483,12 +484,12 @@ const onboardSchema = z.object({
 
 /**
  * POST /api/auth/onboard-company
- * Creates a new company + HR admin user.
+ * Creates a new company + first user for the selected role.
  */
 router.post('/onboard-company', authLimiter, validate(onboardSchema), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-        const { companyName, adminName, adminEmail, adminPassword } = req.body;
+        const { companyName, adminName, adminEmail, adminRole, adminPassword } = req.body;
 
         const normalizedEmail = adminEmail.toLowerCase().trim();
 
@@ -510,24 +511,24 @@ router.post('/onboard-company', authLimiter, validate(onboardSchema), async (req
         );
         const company = compResult.rows[0];
 
-        // Hash password + create HR user
+        // Hash password + create the first workspace user with the selected role
         const passwordHash = await bcrypt.hash(adminPassword, SALT_ROUNDS);
         const userId = crypto.randomUUID();
 
         await client.query(
             `INSERT INTO public.users (user_id, email, password_hash, company_id, role)
-             VALUES ($1, $2, $3, $4, 'hr')`,
-            [userId, normalizedEmail, passwordHash, company.company_id]
+             VALUES ($1, $2, $3, $4, $5)`,
+            [userId, normalizedEmail, passwordHash, company.company_id, adminRole]
         );
 
         await client.query('COMMIT');
 
         logAction({
             actorId: userId,
-            actorRole: 'hr',
+            actorRole: adminRole,
             action: AuditActions.USER_CREATED,
             companyId: company.company_id,
-            metadata: { role: 'hr', adminName: adminName.trim() },
+            metadata: { role: adminRole, adminName: adminName.trim() },
         }).catch(() => {});
 
         return res.status(201).json({

@@ -112,7 +112,7 @@ BEGIN
     VALUES (
         NEW.id,
         (NEW.raw_user_meta_data->>'company_id')::uuid,
-        COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'employee')
+        (NEW.raw_user_meta_data->>'role')::user_role
     );
     RETURN NEW;
 END;

@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     email                 text NOT NULL UNIQUE,
     password_hash         text NOT NULL,
     company_id            uuid NOT NULL REFERENCES public.companies(company_id) ON DELETE RESTRICT,
-    role                  user_role NOT NULL DEFAULT 'employee',
+    role                  user_role NOT NULL,
     reset_token           text,
     reset_token_expires   timestamptz,
     created_at            timestamptz NOT NULL DEFAULT now()
