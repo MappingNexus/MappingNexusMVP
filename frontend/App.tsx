@@ -216,6 +216,7 @@ function App() {
                     <Route path="match" element={<MatchingEngine />} />
                     <Route path="burnout" element={<HRBurnoutRadar />} />
                     <Route path="skills" element={<HRSkillPulse />} />
+                    <Route path="settings" element={<SettingsPage />} />
                 </Route>
 
                 {/* Employee routes */}
