@@ -165,10 +165,14 @@ async function main() {
                 console.log(`  👤 Manager${i} created: ${mgrEmail}  /  ${PASSWORD}`);
             } else {
                 await client.query(
-                    `UPDATE public.users SET password_hash = $1 WHERE email = $2`,
-                    [passwordHash, mgrEmail]
+                    `UPDATE public.users
+                     SET password_hash = $1,
+                         role = 'manager',
+                         company_id = $2
+                     WHERE email = $3`,
+                    [passwordHash, companyId, mgrEmail]
                 );
-                console.log(`  👤 Manager${i} exists:  ${mgrEmail}  (password reset to ${PASSWORD})`);
+                console.log(`  👤 Manager${i} exists:  ${mgrEmail}  (role=manager, password reset to ${PASSWORD})`);
             }
         }
 
