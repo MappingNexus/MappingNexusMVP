@@ -49,13 +49,29 @@ function jsonResponse(body: unknown, status = 200) {
 
 function installBrowserMocks() {
     const storage = new MemoryStorage();
+    const appendedElements: any[] = [];
 
     (globalThis as any).localStorage = storage;
     (globalThis as any).window = {
         clearTimeout: globalThis.clearTimeout.bind(globalThis),
         location: { href: '' },
+        open: () => ({}),
         setTimeout: globalThis.setTimeout.bind(globalThis),
     };
+    (globalThis as any).document = {
+        body: {
+            appendChild: (element: any) => appendedElements.push(element),
+        },
+        createElement: () => ({
+            clickCalled: false,
+            click() {
+                this.clickCalled = true;
+            },
+            remove() {},
+        }),
+    };
+    (globalThis.URL as any).createObjectURL = () => 'blob:resume';
+    (globalThis.URL as any).revokeObjectURL = () => undefined;
 
     return storage;
 }
@@ -170,4 +186,58 @@ test('network aborts are normalized into timeout failures', async () => {
     assert.equal(result.success, false);
     assert.equal(result.status, 408);
     assert.equal(result.message, 'The request timed out. Please try again.');
+});
+
+test('openEmployeeCv opens a PDF blob in a new tab', async () => {
+    let openedUrl = '';
+    (globalThis as any).window.open = (url: string) => {
+        openedUrl = url;
+        return {};
+    };
+    (globalThis as any).fetch = async (url: string) => {
+        assert.equal(new URL(url).pathname, '/api/employees/emp-1/cv');
+        return new Response(new Blob(['%PDF-1.4'], { type: 'application/pdf' }), { status: 200 });
+    };
+
+    const result = await api.openEmployeeCv('emp-1');
+
+    assert.equal(result.success, true);
+    assert.equal(openedUrl, 'blob:resume');
+});
+
+test('openEmployeeCv reports missing resumes clearly', async () => {
+    (globalThis as any).fetch = async () => jsonResponse({ success: false, message: 'CV not uploaded.' }, 404);
+
+    const result = await api.openEmployeeCv('emp-missing');
+
+    assert.equal(result.success, false);
+    assert.equal(result.message, 'CV not uploaded.');
+});
+
+test('downloadEmployeeCv downloads the original filename', async () => {
+    let clicked = false;
+    let downloadName = '';
+    (globalThis as any).document.createElement = () => ({
+        set download(value: string) {
+            downloadName = value;
+        },
+        get download() {
+            return downloadName;
+        },
+        href: '',
+        click() {
+            clicked = true;
+        },
+        remove() {},
+    });
+    (globalThis as any).fetch = async (url: string) => {
+        assert.equal(new URL(url).pathname, '/api/employees/emp-1/cv');
+        return new Response(new Blob(['%PDF-1.4'], { type: 'application/pdf' }), { status: 200 });
+    };
+
+    const result = await api.downloadEmployeeCv('emp-1', 'resume.pdf');
+
+    assert.equal(result.success, true);
+    assert.equal(clicked, true);
+    assert.equal(downloadName, 'resume.pdf');
 });

@@ -851,6 +851,13 @@ router.get('/:id/cv', requireAuth, requireRole('hr', 'manager'), async (req: Req
             return res.status(404).json({ success: false, message: 'Employee not found.' });
         }
 
+        if (user.role === 'manager') {
+            const visibleEmployeeIds = await getManagerVisibleEmployeeIds(supabaseAdmin, user.companyId, user.userId);
+            if (!visibleEmployeeIds.includes(id)) {
+                return res.status(404).json({ success: false, message: 'Employee not found.' });
+            }
+        }
+
         const cv = await pool.query(
             `SELECT file_name, mime_type, file_data_base64
              FROM public.employee_cvs

@@ -357,6 +357,28 @@ export async function openEmployeeCv(employeeId: string): Promise<{ success: boo
     }
 }
 
+export async function downloadEmployeeCv(employeeId: string, fileName = 'employee-cv.pdf'): Promise<{ success: boolean; message?: string }> {
+    try {
+        const response = await fetchWithTimeout(`${API}/api/employees/${employeeId}/cv`);
+        if (!response.ok) {
+            return { success: false, message: response.status === 404 ? 'CV not uploaded.' : 'Unable to download CV.' };
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        return { success: true };
+    } catch {
+        return { success: false, message: 'Unable to download CV.' };
+    }
+}
+
 export async function uploadEmployeeCv(employeeId: string, data: {
     cvFileName: string;
     cvMimeType: string;
