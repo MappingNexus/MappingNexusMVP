@@ -25,6 +25,10 @@ const OnboardingPage: React.FC = () => {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
+    const handleRoleSelect = (nextRole: SignupRole) => {
+        setRole(nextRole);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -50,6 +54,7 @@ const OnboardingPage: React.FC = () => {
         }
 
         try {
+            console.log('Submitting role:', role);
             const response = await api.onboardCompany({ companyName, adminName, email, password, role });
             if (response.success) {
                 setSuccessMessage(response.message || `Workspace created. Sign in as ${role.toUpperCase()} to continue.`);
@@ -142,7 +147,7 @@ const OnboardingPage: React.FC = () => {
                                             <button
                                                 key={option.value}
                                                 type="button"
-                                                onClick={() => setRole(option.value)}
+                                                onClick={() => handleRoleSelect(option.value)}
                                                 className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs sm:text-sm font-semibold transition-all ${
                                                     isActive
                                                         ? 'bg-[#111] text-white dark:bg-white dark:text-[#111] shadow-md ring-2 ring-[#111] dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#111]'
