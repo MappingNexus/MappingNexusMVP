@@ -31,6 +31,7 @@ import { matchingLimiter } from '../middleware/rateLimiter.js';
 import { decrypt, hashForDisplay } from '../services/encryption.service.js';
 import { logAction, AuditActions } from '../services/audit.service.js';
 import { env } from '../config/env.js';
+import { pool } from '../config/db.js';
 import { generateQueryEmbedding } from '../services/embedding.service.js';
 import { getCompanySecret } from '../utils/company-secret.js';
 import { validate } from '../utils/validation.js';
@@ -445,14 +446,17 @@ router.post('/', matchingLimiter, requireAuth, requireRole('hr', 'manager'), val
 
         // Manager: only match within approved team
         if (user.role === 'manager') {
-            const { data: memberships } = await db
-                .from('team_memberships')
-                .select('employee_id, teams!inner(manager_id)')
-                .eq('company_id', user.companyId)
-                .eq('status', 'approved')
-                .eq('teams.manager_id', user.userId);
+            const memberships = await pool.query(
+                `SELECT DISTINCT tm.employee_id
+                 FROM public.team_memberships tm
+                 JOIN public.teams t ON t.team_id = tm.team_id AND t.company_id = tm.company_id
+                 WHERE tm.company_id = $1
+                   AND tm.status = 'approved'
+                   AND t.manager_id = $2`,
+                [user.companyId, user.userId]
+            );
 
-            const teamEmpIds = memberships?.map((m: any) => m.employee_id) || [];
+            const teamEmpIds = memberships.rows.map(row => row.employee_id);
             const intersection = empIds.filter(id => teamEmpIds.includes(id));
 
             if (intersection.length === 0) {

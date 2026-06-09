@@ -21,14 +21,17 @@ const router = Router();
 const DEFAULT_CAPACITY_PER_ASSIGNMENT_PCT = 25;
 
 async function getManagerVisibleEmployeeIds(companyId: string, managerId: string): Promise<string[]> {
-    const { data: memberships } = await supabaseAdmin
-        .from('team_memberships')
-        .select('employee_id, teams!inner(manager_id)')
-        .eq('company_id', companyId)
-        .eq('status', 'approved')
-        .eq('teams.manager_id', managerId);
+    const result = await pool.query(
+        `SELECT DISTINCT tm.employee_id
+         FROM public.team_memberships tm
+         JOIN public.teams t ON t.team_id = tm.team_id AND t.company_id = tm.company_id
+         WHERE tm.company_id = $1
+           AND tm.status = 'approved'
+           AND t.manager_id = $2`,
+        [companyId, managerId]
+    );
 
-    return (memberships || []).map((membership: any) => membership.employee_id);
+    return result.rows.map(row => row.employee_id);
 }
 
 async function syncEmployeeCapacitySnapshot(companyId: string, employeeId: string) {

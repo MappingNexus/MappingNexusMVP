@@ -13,6 +13,7 @@ import { Router, Request, Response } from 'express';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../middleware/auth.js';
 import { decrypt, decryptFields, hashForDisplay } from '../services/encryption.service.js';
 import { getCompanySecret } from '../utils/company-secret.js';
+import { pool } from '../config/db.js';
 
 const router = Router();
 const MS_PER_DAY = 86400000;
@@ -226,13 +227,16 @@ async function getVisibleEmployeeIds(
     }
 
     if (user.role === 'manager') {
-        const { data: memberships } = await db
-            .from('team_memberships')
-            .select('employee_id, teams!inner(manager_id)')
-            .eq('company_id', user.companyId)
-            .eq('status', 'approved')
-            .eq('teams.manager_id', user.userId);
-        return (memberships || []).map((m: any) => m.employee_id);
+        const result = await pool.query(
+            `SELECT DISTINCT tm.employee_id
+             FROM public.team_memberships tm
+             JOIN public.teams t ON t.team_id = tm.team_id AND t.company_id = tm.company_id
+             WHERE tm.company_id = $1
+               AND tm.status = 'approved'
+               AND t.manager_id = $2`,
+            [user.companyId, user.userId]
+        );
+        return result.rows.map(row => row.employee_id);
     }
 
     return [];
