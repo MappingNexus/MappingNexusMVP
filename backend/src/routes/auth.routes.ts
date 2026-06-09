@@ -25,6 +25,7 @@ import { authLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js'
 import { logAction, AuditActions } from '../services/audit.service.js';
 import { revokeAllSessionsForUser } from '../services/session.service.js';
 import { validate } from '../utils/validation.js';
+import { encryptFields } from '../services/encryption.service.js';
 
 const router = Router();
 const SALT_ROUNDS = 12;
@@ -471,9 +472,12 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
 const onboardSchema = z.object({
     companyName: z.string().trim().min(1, 'Company name is required.').max(200),
     adminName: z.string().trim().min(1, 'Admin name is required.').max(200),
-    adminEmail: z.string().trim().email('Invalid email format.'),
-    adminRole: z.enum(['hr', 'manager', 'employee']),
-    adminPassword: z
+    email: z.string().trim().email('Invalid email format.'),
+    role: z.enum(['hr', 'manager', 'employee'], {
+        required_error: 'Role is required.',
+        invalid_type_error: 'Role must be HR, Manager, or Employee.',
+    }),
+    password: z
         .string()
         .min(8, 'Password must be at least 8 characters.')
         .max(256, 'Password must be at most 256 characters.')
@@ -489,9 +493,9 @@ const onboardSchema = z.object({
 router.post('/onboard-company', authLimiter, validate(onboardSchema), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-        const { companyName, adminName, adminEmail, adminRole, adminPassword } = req.body;
+        const { companyName, adminName, email, role, password } = req.body;
 
-        const normalizedEmail = adminEmail.toLowerCase().trim();
+        const normalizedEmail = email.toLowerCase().trim();
 
         // Check email not already used
         const existing = await client.query(
@@ -512,36 +516,65 @@ router.post('/onboard-company', authLimiter, validate(onboardSchema), async (req
         const company = compResult.rows[0];
 
         // Hash password + create the first workspace user with the selected role
-        const passwordHash = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+        const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
         const userId = crypto.randomUUID();
 
         await client.query(
             `INSERT INTO public.users (user_id, email, password_hash, company_id, role)
              VALUES ($1, $2, $3, $4, $5)`,
-            [userId, normalizedEmail, passwordHash, company.company_id, adminRole]
+            [userId, normalizedEmail, passwordHash, company.company_id, role]
         );
+
+        if (role === 'employee') {
+            const encrypted = await encryptFields({
+                name_encrypted: adminName.trim(),
+                work_email_encrypted: normalizedEmail,
+            }, company.company_id);
+
+            await client.query(
+                `INSERT INTO public.employees
+                    (user_id, company_id, name_encrypted, work_email_encrypted, department, seniority_level, location)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [
+                    userId,
+                    company.company_id,
+                    encrypted.name_encrypted,
+                    encrypted.work_email_encrypted,
+                    'General',
+                    'mid',
+                    'Remote',
+                ]
+            );
+        }
 
         await client.query('COMMIT');
 
         logAction({
             actorId: userId,
-            actorRole: adminRole,
+            actorRole: role,
             action: AuditActions.USER_CREATED,
             companyId: company.company_id,
-            metadata: { role: adminRole, adminName: adminName.trim() },
+            metadata: { role, adminName: adminName.trim() },
         }).catch(() => {});
 
         return res.status(201).json({
             success: true,
-            message: `Workspace "${company.company_name}" created. Sign in with ${normalizedEmail} to get started.`,
+            message: `Workspace "${company.company_name}" created with ${role.toUpperCase()} access. Sign in with ${normalizedEmail} to open your ${role} dashboard.`,
             company: {
                 companyId: company.company_id,
                 companyName: company.company_name,
+            },
+            user: {
+                email: normalizedEmail,
+                role,
             },
         });
     } catch (err: any) {
         await client.query('ROLLBACK').catch(() => {});
         console.error('Company onboarding error:', err.message);
+        if (err?.code === '23505') {
+            return res.status(409).json({ success: false, message: 'Email already registered.' });
+        }
         return res.status(500).json({ success: false, message: 'Failed to onboard company.' });
     } finally {
         client.release();

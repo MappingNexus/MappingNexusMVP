@@ -16,9 +16,9 @@ const roleOptions: Array<{ value: SignupRole; label: string; Icon: typeof Buildi
 const OnboardingPage: React.FC = () => {
     const [companyName, setCompanyName] = useState('');
     const [adminName, setAdminName] = useState('');
-    const [adminEmail, setAdminEmail] = useState('');
-    const [adminRole, setAdminRole] = useState<SignupRole | ''>('');
-    const [adminPassword, setAdminPassword] = useState('');
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState<SignupRole | ''>('');
+    const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -31,33 +31,36 @@ const OnboardingPage: React.FC = () => {
         setError('');
         setSuccessMessage('');
 
-        if (adminPassword !== confirmPassword) {
+        if (!role) {
+            setError('Select HR, Manager, or Employee before creating the workspace.');
+            setLoading(false);
+            return;
+        }
+
+        if (password !== confirmPassword) {
             setError('Passwords do not match.');
             setLoading(false);
             return;
         }
 
-        if (adminPassword.length < 8) {
+        if (password.length < 8) {
             setError('Password must be at least 8 characters.');
             setLoading(false);
             return;
         }
 
-        if (!adminRole) {
-            setError('Choose an account role.');
+        try {
+            const response = await api.onboardCompany({ companyName, adminName, email, password, role });
+            if (response.success) {
+                setSuccessMessage(response.message || `Workspace created. Sign in as ${role.toUpperCase()} to continue.`);
+            } else {
+                setError(response.message || 'Failed to create workspace.');
+            }
+        } catch {
+            setError('Failed to reach onboarding service.');
+        } finally {
             setLoading(false);
-            return;
         }
-
- try {
- const response = await api.onboardCompany({ companyName, adminName, adminEmail, adminRole, adminPassword });
- if (response.success) setSuccessMessage(response.message || 'Workspace created successfully.');
- else setError(response.message || 'Failed to create workspace.');
- } catch {
- setError('Failed to reach onboarding service.');
- } finally {
- setLoading(false);
- }
  };
 
  return (
@@ -100,6 +103,7 @@ const OnboardingPage: React.FC = () => {
                                     className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
                                     placeholder="Acme Corp"
                                     disabled={loading}
+                                    required
                                 />
                             </div>
                             
@@ -111,6 +115,7 @@ const OnboardingPage: React.FC = () => {
                                     className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
                                     placeholder="Jane Smith"
                                     disabled={loading}
+                                    required
                                 />
                             </div>
                             
@@ -118,25 +123,26 @@ const OnboardingPage: React.FC = () => {
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Work Email</label>
                                 <input 
                                     type="email" 
-                                    value={adminEmail} 
-                                    onChange={e => setAdminEmail(e.target.value)}
+                                    value={email} 
+                                    onChange={e => setEmail(e.target.value)}
                                     className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
                                     placeholder="jane.smith@acmecorp.com"
                                     disabled={loading}
+                                    required
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Account Role <span className="text-destructive">*</span></label>
                                 <div className="grid grid-cols-3 gap-2 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/40 dark:bg-black/40 p-1.5">
-                                    {roleOptions.map((role) => {
-                                        const isActive = adminRole === role.value;
-                                        const { Icon } = role;
+                                    {roleOptions.map((option) => {
+                                        const isActive = role === option.value;
+                                        const { Icon } = option;
                                         return (
                                             <button
-                                                key={role.value}
+                                                key={option.value}
                                                 type="button"
-                                                onClick={() => setAdminRole(role.value)}
+                                                onClick={() => setRole(option.value)}
                                                 className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs sm:text-sm font-semibold transition-all ${
                                                     isActive
                                                         ? 'bg-[#111] text-white dark:bg-white dark:text-[#111] shadow-md ring-2 ring-[#111] dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#111]'
@@ -144,13 +150,19 @@ const OnboardingPage: React.FC = () => {
                                                 }`}
                                                 disabled={loading}
                                                 aria-pressed={isActive}
+                                                aria-label={`Select ${option.label} role`}
                                             >
                                                 <Icon className="h-5 w-5" />
-                                                <span>{role.label}</span>
+                                                <span>{option.label}</span>
                                             </button>
                                         );
                                     })}
                                 </div>
+                                {!role && (
+                                    <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                                        Required: this role controls which dashboard the account can access.
+                                    </p>
+                                )}
                             </div>
 
                             <div>
@@ -158,12 +170,13 @@ const OnboardingPage: React.FC = () => {
                                 <div className="relative">
                                     <input 
                                         type={showPassword ? 'text' : 'password'}
-                                        value={adminPassword} 
-                                        onChange={e => setAdminPassword(e.target.value)}
+                                        value={password} 
+                                        onChange={e => setPassword(e.target.value)}
                                         className="w-full bg-white/50 dark:bg-black/50 border border-gray-200 dark:border-white/10 rounded-xl px-4 py-3 pr-12 text-[#111] dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#111] dark:focus:ring-white/50 transition-all"
                                         placeholder="Min. 8 characters"
                                         disabled={loading}
                                         minLength={8}
+                                        required
                                     />
                                     <button
                                         type="button"
@@ -186,6 +199,7 @@ const OnboardingPage: React.FC = () => {
                                     placeholder="Repeat password"
                                     disabled={loading}
                                     minLength={8}
+                                    required
                                 />
                             </div>
 

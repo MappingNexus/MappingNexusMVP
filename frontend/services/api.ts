@@ -267,9 +267,9 @@ export async function resetPassword(token: string, newPassword: string) {
 export async function onboardCompany(data: {
     companyName: string;
     adminName: string;
-    adminEmail: string;
-    adminRole: UserProfile['role'];
-    adminPassword: string;
+    email: string;
+    password: string;
+    role: UserProfile['role'];
 }) {
     return request('/api/auth/onboard-company', {
         method: 'POST',

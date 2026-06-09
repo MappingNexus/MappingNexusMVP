@@ -26,6 +26,12 @@ interface TestCompany {
     company_name: string;
 }
 
+interface TestEmployee {
+    employee_id: string;
+    user_id: string;
+    company_id: string;
+}
+
 interface TestRefreshSession {
     session_id: string;
     user_id: string;
@@ -106,9 +112,11 @@ jest.unstable_mockModule('../services/audit.service.js', () => ({
 class FakeDb {
     users = new Map<string, TestUser>();
     companies = new Map<string, TestCompany>();
+    employees = new Map<string, TestEmployee>();
     refreshSessions = new Map<string, TestRefreshSession>();
     queries: Array<{ sql: string; params: any[] }> = [];
     private companyCounter = 0;
+    private employeeCounter = 0;
     private sessionCounter = 0;
 
     connect() {
@@ -162,7 +170,8 @@ class FakeDb {
         }
 
         if (normalized.startsWith('select employee_id from public.employees')) {
-            return result([]);
+            const employee = [...this.employees.values()].find(emp => emp.user_id === params[0]);
+            return result(employee ? [{ employee_id: employee.employee_id }] : []);
         }
 
         if (normalized.startsWith('insert into public.refresh_token_sessions')) {
@@ -267,6 +276,16 @@ class FakeDb {
                 reset_token_used: false,
             };
             this.users.set(user.user_id, user);
+            return result([], 1);
+        }
+
+        if (normalized.startsWith('insert into public.employees')) {
+            const employee: TestEmployee = {
+                employee_id: `employee-${++this.employeeCounter}`,
+                user_id: params[0],
+                company_id: params[1],
+            };
+            this.employees.set(employee.employee_id, employee);
             return result([], 1);
         }
 
@@ -455,20 +474,23 @@ describe('complete auth system', () => {
     });
 
     describe('onboarding', () => {
-        it('creates an admin account for a valid onboarding payload', async () => {
+        it('creates an HR account for a valid onboarding payload and allows HR login', async () => {
             // setup
             const payload = {
                 companyName: 'Acme Corp',
                 adminName: 'Ada Admin',
-                adminEmail: 'Ada.Admin@Example.com',
-                adminRole: 'hr',
-                adminPassword: 'StrongPass123',
+                email: 'Ada.Admin@Example.com',
+                role: 'hr',
+                password: 'StrongPass123',
             };
 
             // action
             const response = await request(app)
                 .post('/api/auth/onboard-company')
                 .send(payload);
+            const loginResponse = await request(app)
+                .post('/api/auth/login')
+                .send({ email: payload.email, password: payload.password });
 
             // assertion
             expect(response.status).toBe(201);
@@ -481,29 +503,76 @@ describe('complete auth system', () => {
             expect(response.body.message).toContain('ada.admin@example.com');
             const admin = db.findUserByEmail('ada.admin@example.com');
             expect(admin).toMatchObject({ role: 'hr', status: 'active', token_version: 0 });
-            await expect(bcrypt.compare(payload.adminPassword, admin!.password_hash)).resolves.toBe(true);
+            await expect(bcrypt.compare(payload.password, admin!.password_hash)).resolves.toBe(true);
+            expect(loginResponse.status).toBe(200);
+            expect(loginResponse.body.user).toMatchObject({
+                email: 'ada.admin@example.com',
+                role: 'hr',
+            });
         });
 
-        it('persists the selected manager role during onboarding', async () => {
+        it('persists the selected manager role during onboarding and allows manager login', async () => {
             // setup
             const payload = {
                 companyName: 'Manager Co',
                 adminName: 'Morgan Manager',
-                adminEmail: 'Morgan.Manager@Example.com',
-                adminRole: 'manager',
-                adminPassword: 'StrongPass123',
+                email: 'Morgan.Manager@Example.com',
+                role: 'manager',
+                password: 'StrongPass123',
             };
 
             // action
             const response = await request(app)
                 .post('/api/auth/onboard-company')
                 .send(payload);
+            const loginResponse = await request(app)
+                .post('/api/auth/login')
+                .send({ email: payload.email, password: payload.password });
 
             // assertion
             expect(response.status).toBe(201);
             const manager = db.findUserByEmail('morgan.manager@example.com');
             expect(manager).toMatchObject({ role: 'manager', status: 'active', token_version: 0 });
-            await expect(bcrypt.compare(payload.adminPassword, manager!.password_hash)).resolves.toBe(true);
+            await expect(bcrypt.compare(payload.password, manager!.password_hash)).resolves.toBe(true);
+            expect(loginResponse.status).toBe(200);
+            expect(loginResponse.body.user).toMatchObject({
+                email: 'morgan.manager@example.com',
+                role: 'manager',
+            });
+        });
+
+        it('persists the selected employee role, creates an employee profile, and allows employee login', async () => {
+            // setup
+            const payload = {
+                companyName: 'Employee Co',
+                adminName: 'Emery Employee',
+                email: 'Emery.Employee@Example.com',
+                role: 'employee',
+                password: 'StrongPass123',
+            };
+
+            // action
+            const response = await request(app)
+                .post('/api/auth/onboard-company')
+                .send(payload);
+            const loginResponse = await request(app)
+                .post('/api/auth/login')
+                .send({ email: payload.email, password: payload.password });
+
+            // assertion
+            expect(response.status).toBe(201);
+            const employee = db.findUserByEmail('emery.employee@example.com');
+            expect(employee).toMatchObject({ role: 'employee', status: 'active', token_version: 0 });
+            expect([...db.employees.values()]).toContainEqual(expect.objectContaining({
+                user_id: employee!.user_id,
+                company_id: employee!.company_id,
+            }));
+            expect(loginResponse.status).toBe(200);
+            expect(loginResponse.body.user).toMatchObject({
+                email: 'emery.employee@example.com',
+                role: 'employee',
+                employeeId: expect.any(String),
+            });
         });
 
         it('returns 400 when required onboarding fields are missing', async () => {
@@ -532,9 +601,9 @@ describe('complete auth system', () => {
                 .send({
                     companyName: 'Duplicate Co',
                     adminName: 'Ada Admin',
-                    adminEmail: 'ADMIN@example.com',
-                    adminRole: 'hr',
-                    adminPassword: 'StrongPass123',
+                    email: 'ADMIN@example.com',
+                    role: 'hr',
+                    password: 'StrongPass123',
                 });
 
             // assertion
