@@ -1,13 +1,23 @@
 import React, { useState } from 'react';
-import { AlertCircle, ArrowRight, CheckCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { AlertCircle, ArrowRight, BriefcaseBusiness, Building2, CheckCircle, Eye, EyeOff, Loader2, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import * as api from '../../services/api';
 import PublicLayout from '../shared/PublicLayout';
+import type { UserProfile } from '../../types';
+
+type SignupRole = UserProfile['role'];
+
+const roleOptions: Array<{ value: SignupRole; label: string; Icon: typeof Building2 }> = [
+    { value: 'hr', label: 'HR', Icon: Building2 },
+    { value: 'manager', label: 'Manager', Icon: BriefcaseBusiness },
+    { value: 'employee', label: 'Employee', Icon: UserRound },
+];
 
 const OnboardingPage: React.FC = () => {
     const [companyName, setCompanyName] = useState('');
     const [adminName, setAdminName] = useState('');
     const [adminEmail, setAdminEmail] = useState('');
+    const [adminRole, setAdminRole] = useState<SignupRole | ''>('');
     const [adminPassword, setAdminPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -33,8 +43,14 @@ const OnboardingPage: React.FC = () => {
             return;
         }
 
+        if (!adminRole) {
+            setError('Choose an account role.');
+            setLoading(false);
+            return;
+        }
+
  try {
- const response = await api.onboardCompany({ companyName, adminName, adminEmail, adminPassword });
+ const response = await api.onboardCompany({ companyName, adminName, adminEmail, adminRole, adminPassword });
  if (response.success) setSuccessMessage(response.message || 'Workspace created successfully.');
  else setError(response.message || 'Failed to create workspace.');
  } catch {
@@ -54,7 +70,7 @@ const OnboardingPage: React.FC = () => {
  Create a workspace.
  </h1>
  <p className="mt-3 cb-body text-base sm:text-lg leading-relaxed">
- Provision your company workspace and create an HR admin account.
+ Provision your company workspace and create your first account.
  </p>
  </div>
 
@@ -88,7 +104,7 @@ const OnboardingPage: React.FC = () => {
                             </div>
                             
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Admin Full Name</label>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
                                 <input 
                                     value={adminName} 
                                     onChange={e => setAdminName(e.target.value)}
@@ -99,7 +115,7 @@ const OnboardingPage: React.FC = () => {
                             </div>
                             
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Admin Work Email</label>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Work Email</label>
                                 <input 
                                     type="email" 
                                     value={adminEmail} 
@@ -111,7 +127,34 @@ const OnboardingPage: React.FC = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Admin Password</label>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Account Role <span className="text-destructive">*</span></label>
+                                <div className="grid grid-cols-3 gap-2 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/40 dark:bg-black/40 p-1.5">
+                                    {roleOptions.map((role) => {
+                                        const isActive = adminRole === role.value;
+                                        const { Icon } = role;
+                                        return (
+                                            <button
+                                                key={role.value}
+                                                type="button"
+                                                onClick={() => setAdminRole(role.value)}
+                                                className={`relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs sm:text-sm font-semibold transition-all ${
+                                                    isActive
+                                                        ? 'bg-[#111] text-white dark:bg-white dark:text-[#111] shadow-md ring-2 ring-[#111] dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#111]'
+                                                        : 'border border-transparent text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-white/10 hover:text-[#111] dark:hover:text-white'
+                                                }`}
+                                                disabled={loading}
+                                                aria-pressed={isActive}
+                                            >
+                                                <Icon className="h-5 w-5" />
+                                                <span>{role.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Password</label>
                                 <div className="relative">
                                     <input 
                                         type={showPassword ? 'text' : 'password'}

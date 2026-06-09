@@ -10,7 +10,7 @@ const demoCompany = {
 
 const today = new Date();
 
-<<<<<<< HEAD
+/*
 async function seed() {
     console.log('Seeding Mapping Nexus DB via API...');
 
@@ -22,6 +22,7 @@ async function seed() {
             companyName: 'Acme Global Innovations',
             adminName: 'Jane Smith',
             adminEmail: 'jane.admin@acmeglobal.com',
+            adminRole: 'hr',
             adminPassword: 'ChangeMe123!'
         })
     });
@@ -113,12 +114,11 @@ async function seed() {
     console.log('Password: ChangeMe123!');
     console.log('Security: employee PII is encrypted at rest by the server.');
     console.log('================================\n');
-=======
+*/
 function isoDate(offsetDays) {
     const d = new Date(today);
     d.setDate(d.getDate() + offsetDays);
     return d.toISOString().split('T')[0];
->>>>>>> manya
 }
 
 async function apiFetch(path, options = {}) {
@@ -144,6 +144,7 @@ async function createCompany() {
             companyName: demoCompany.companyName,
             adminName: demoCompany.adminName,
             adminEmail: demoCompany.adminEmail,
+            adminRole: 'hr',
             adminPassword: demoCompany.adminPassword,
         }),
     });

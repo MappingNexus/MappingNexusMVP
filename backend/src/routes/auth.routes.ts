@@ -2,7 +2,7 @@
  * Authentication Routes — Neon DB + Custom JWT
  *
  * POST /api/auth/login              — Login → returns JWT + user profile
- * POST /api/auth/onboard-company    — Create company + HR admin account
+ * POST /api/auth/onboard-company    — Create company + first role-scoped account
  * POST /api/auth/invite-user        — HR invites employee/manager
  * POST /api/auth/change-password    — Change password (authenticated)
  * POST /api/auth/forgot-password    — Send reset email with secure token link
