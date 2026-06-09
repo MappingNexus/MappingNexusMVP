@@ -611,24 +611,25 @@ router.get('/skills', requireAuth, requireRole('hr', 'manager'), async (req: Req
             return acc;
         }, {} as Record<string, Set<string>>);
 
-        const allSkillEntries = Object.entries(demandMap);
+        const allDemandEntries = Object.entries(demandMap) as Array<[string, { demand: number; active: number; planned: number; recent: number }]>;
+        const workforceEntries = Object.entries(workforceMap) as Array<[string, Set<string>]>;
 
-        const topSkills = allSkillEntries
-            .sort((a, b) => b[1].demand - a[1].demand)
+        const topSkills = workforceEntries
+            .sort((a, b) => b[1].size - a[1].size)
             .slice(0, 10)
-            .map(([name, data]) => ({
+            .map(([name, employees]) => ({
                 name,
-                employeeCount: data.demand,
-                demandScore: Math.min(100, data.active * 15 + data.planned * 10),
+                employeeCount: employees.size,
+                demandScore: Math.min(100, (demandMap[name]?.active || 0) * 15 + (demandMap[name]?.planned || 0) * 10),
             }));
 
-        const dormantSkills = allSkillEntries
-            .filter(([, data]) => data.active === 0 && data.planned > 0)
-            .sort((a, b) => b[1].planned - a[1].planned)
+        const dormantSkills = workforceEntries
+            .filter(([name]) => !demandMap[name] || ((demandMap[name].active + demandMap[name].planned) === 0))
+            .sort((a, b) => b[1].size - a[1].size)
             .slice(0, 10)
-            .map(([name, data]) => ({
+            .map(([name, employees]) => ({
                 name,
-                employeeCount: data.planned,
+                employeeCount: employees.size,
                 avgDaysSinceUsed: 0, // calculated per-skill below if needed
             }));
 
@@ -655,7 +656,7 @@ router.get('/skills', requireAuth, requireRole('hr', 'manager'), async (req: Req
             }
         });
 
-        const trendingSkills = allSkillEntries
+        const trendingSkills = allDemandEntries
             .filter(([, data]) => data.recent > 0)
             .sort((a, b) => (b[1].recent + b[1].active) - (a[1].recent + a[1].active))
             .slice(0, 5)
@@ -667,7 +668,7 @@ router.get('/skills', requireAuth, requireRole('hr', 'manager'), async (req: Req
                 };
             });
 
-        const skillGaps = allSkillEntries
+        const skillGaps = allDemandEntries
             .map(([name, data]) => {
                 const available = availabilityAwareWorkforceMap[name]?.size || 0;
                 return { name, total: data.demand, available, gap: Math.max(0, data.demand - available) };

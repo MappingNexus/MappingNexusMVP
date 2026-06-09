@@ -92,7 +92,7 @@ router.get('/', requireAuth, requireRole('hr', 'manager'), async (req: Request, 
 
         let query = db
             .from('employee_requests')
-            .select('*, manager:manager_id(user_id)')
+            .select('*')
             .eq('company_id', user.companyId)
             .order('created_at', { ascending: false });
 

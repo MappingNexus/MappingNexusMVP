@@ -42,6 +42,14 @@ const ALLOWED_CV_MIME_TYPES = new Set([
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
+const RESUME_SKILL_KEYWORDS = [
+    'javascript', 'typescript', 'react', 'angular', 'vue', 'node.js', 'node', 'express',
+    'python', 'django', 'flask', 'java', 'spring', 'c#', '.net', 'go', 'golang',
+    'postgresql', 'postgres', 'mysql', 'mongodb', 'redis', 'aws', 'azure', 'gcp',
+    'docker', 'kubernetes', 'terraform', 'ci/cd', 'devops', 'machine learning',
+    'data analysis', 'sql', 'tableau', 'power bi', 'figma', 'product management',
+    'project management', 'agile', 'scrum', 'qa', 'testing', 'cybersecurity',
+];
 const ALLOWED_PROFICIENCIES = new Set(['beginner', 'intermediate', 'expert']);
 const availabilityWindowSchema = z.object({
     availabilityWindowId: z.string().uuid().optional(),
@@ -277,6 +285,42 @@ function validateCvPayload(payload: { cvFileName?: string; cvMimeType?: string; 
     return { valid: true };
 }
 
+function extractSkillsFromResume(cvDataBase64?: string) {
+    if (!cvDataBase64) return [];
+
+    let searchable = '';
+    try {
+        searchable = Buffer.from(cvDataBase64, 'base64').toString('utf8').toLowerCase();
+    } catch {
+        return [];
+    }
+
+    return RESUME_SKILL_KEYWORDS
+        .filter(skill => new RegExp(`(^|[^a-z0-9+#.])${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9+#.]|$)`, 'i').test(searchable))
+        .map(skill => (skill === 'node' ? 'node.js' : skill === 'postgres' ? 'postgresql' : skill === 'golang' ? 'go' : skill));
+}
+
+async function mergeExtractedSkills(employeeId: string, companyId: string, extractedSkills: string[]) {
+    const uniqueSkills = [...new Set(extractedSkills.map(skill => skill.trim().toLowerCase()).filter(Boolean))];
+    if (uniqueSkills.length === 0) return;
+
+    for (const skill of uniqueSkills.slice(0, MAX_SKILLS_PER_EMPLOYEE)) {
+        await pool.query(
+            `INSERT INTO public.skills (employee_id, company_id, skill_name, proficiency, last_used_date, embedding)
+             SELECT $1, $2, $3, 'intermediate', CURRENT_DATE, NULL
+             WHERE NOT EXISTS (
+                SELECT 1 FROM public.skills
+                WHERE employee_id = $1
+                  AND company_id = $2
+                  AND lower(skill_name) = lower($3)
+             )`,
+            [employeeId, companyId, skill]
+        );
+    }
+
+    await enqueueEmbeddingJob(employeeId, uniqueSkills.join(', '));
+}
+
 async function upsertEmployeeCv(params: {
     employeeId: string;
     companyId: string;
@@ -368,6 +412,8 @@ async function formatEmployeeResponse(
         hasCv: Boolean(cv),
         cvFileName: cv?.file_name || null,
         cvUploadedAt: cv?.uploaded_at || null,
+        resumeUrl: cv ? `/api/employees/${emp.employee_id}/cv` : null,
+        resumePath: cv ? `/api/employees/${emp.employee_id}/cv` : null,
         availabilityWindows: (windows || []).map(window => ({
             availabilityWindowId: window.availability_window_id,
             windowType: window.window_type,
@@ -588,6 +634,15 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
                 cvMimeType,
                 cvDataBase64,
             });
+            await mergeExtractedSkills(employee.employee_id, user.companyId, extractSkillsFromResume(cvDataBase64));
+            await logAction({
+                actorId: user.userId,
+                actorRole: user.role,
+                action: AuditActions.RESUME_UPLOADED,
+                targetId: employee.employee_id,
+                companyId: user.companyId,
+                metadata: { fileName: cvFileName },
+            });
         }
 
         if (requestId) {
@@ -627,6 +682,8 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
                 employeeId: employee.employee_id,
                 displayId: hashForDisplay(employee.employee_id),
                 department,
+                hasCv: Boolean(cvFileName && cvMimeType && cvDataBase64),
+                resumeUrl: cvFileName ? `/api/employees/${employee.employee_id}/cv` : null,
             },
             onboarding: emailResult,
         });
@@ -909,11 +966,21 @@ router.post('/:id/cv', requireAuth, requireRole('hr'), async (req: Request, res:
             cvMimeType,
             cvDataBase64,
         });
+        await mergeExtractedSkills(id, user.companyId, extractSkillsFromResume(cvDataBase64));
+        await logAction({
+            actorId: user.userId,
+            actorRole: user.role,
+            action: AuditActions.RESUME_UPLOADED,
+            targetId: id,
+            companyId: user.companyId,
+            metadata: { fileName: cvFileName },
+        });
 
         res.json({
             success: true,
             cv: {
                 fileName: cvFileName,
+                resumeUrl: `/api/employees/${id}/cv`,
             },
         });
     } catch (err: any) {

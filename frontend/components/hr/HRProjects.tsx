@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FolderKanban, Loader2, Plus } from 'lucide-react';
+import { FolderKanban, Loader2, Plus, UserRound } from 'lucide-react';
 import * as api from '../../services/api';
 import type { Project } from '../../types';
 import LoadingSpinner from '../shared/LoadingSpinner';
@@ -35,6 +35,8 @@ const HRProjects: React.FC = () => {
  }, []);
 
  const activeProjects = useMemo(() => projects.filter((project) => project.status !== 'completed').length, [projects]);
+ const requiredPeople = useMemo(() => projects.reduce((sum, project) => sum + (project.requiredEmployees ?? 0), 0), [projects]);
+ const assignedPeople = useMemo(() => projects.reduce((sum, project) => sum + (project.assignedEmployees ?? 0), 0), [projects]);
 
  const updateSkill = (index: number, field: keyof SkillInput, value: string) => {
  const nextSkills = [...form.requiredSkills];
@@ -93,7 +95,6 @@ const HRProjects: React.FC = () => {
  };
 
  const response = editingId ? await api.updateProject(editingId, payload) : await api.createProject(payload);
-
  setSaving(false);
 
  if (!response.success) {
@@ -107,7 +108,7 @@ const HRProjects: React.FC = () => {
  await loadProjects();
  };
 
- if (loading) return <LoadingSpinner message="Loading projects…" />;
+ if (loading) return <LoadingSpinner message="Loading projects..." />;
 
  return (
  <div className="cb-page">
@@ -115,7 +116,7 @@ const HRProjects: React.FC = () => {
  <div>
  <h1 className="cb-h1">Projects</h1>
  <p className="cb-subtitle mt-3">
- <span className="font-mono">{projects.length}</span> total • <span className="font-mono">{activeProjects}</span> active or planned
+ <span className="font-mono">{projects.length}</span> total | <span className="font-mono">{activeProjects}</span> active or planned | <span className="font-mono">{assignedPeople}/{requiredPeople}</span> people assigned
  </p>
  </div>
  <button onClick={() => startEditing()} className="cb-btn-primary">
@@ -185,7 +186,7 @@ const HRProjects: React.FC = () => {
  <button type="submit" disabled={saving} className="cb-btn-primary w-full">
  {saving ? (
  <>
- <Loader2 className="w-4 h-4 animate-spin" /> Saving…
+ <Loader2 className="w-4 h-4 animate-spin" /> Saving...
  </>
  ) : editingId ? (
  'Update project'
@@ -214,20 +215,49 @@ const HRProjects: React.FC = () => {
  <button
  key={project.project_id}
  onClick={() => startEditing(project)}
- className="w-full text-left border border-border rounded-2xl p-5 hover:bg-muted transition-colors"
+ className="w-full text-left border border-border rounded-lg p-5 hover:bg-muted transition-colors"
  >
  <div className="flex items-start justify-between gap-4">
  <div>
  <h3 className="text-foreground font-semibold">{project.project_name}</h3>
- <p className="cb-body text-sm mt-1">
- <span className="font-mono">{project.required_skills?.length || 0}</span> skill requirements
+ <p className="cb-body text-sm mt-1 flex items-center gap-2">
+ <UserRound className="w-4 h-4" />
+ {project.manager || 'Unassigned'}
  </p>
  </div>
- <span className="cb-pill">{project.status}</span>
+ <span className={`cb-pill ${project.progressStatus === 'At Risk' ? 'border-destructive/30 text-destructive bg-destructive/10' : ''}`}>
+ {project.progressStatus || project.status}
+ </span>
  </div>
- <div className="mt-3 text-sm cb-body">
- {project.start_date ? `Start ${new Date(project.start_date).toLocaleDateString()}` : 'Start TBD'} •{' '}
- {project.end_date ? `End ${new Date(project.end_date).toLocaleDateString()}` : 'No end date'}
+
+ <div className="mt-4 grid grid-cols-2 gap-3 text-sm cb-body">
+ <div>
+ <span className="block text-xs uppercase tracking-widest text-muted-foreground">Required</span>
+ <span className="font-mono text-foreground">{project.requiredEmployees ?? 0}</span>
+ </div>
+ <div>
+ <span className="block text-xs uppercase tracking-widest text-muted-foreground">Assigned</span>
+ <span className="font-mono text-foreground">{project.assignedEmployees ?? 0}</span>
+ </div>
+ </div>
+
+ <div className="mt-4">
+ <div className="flex items-center justify-between text-xs font-mono text-muted-foreground mb-2">
+ <span>Completion</span>
+ <span>{project.completionPercentage ?? 0}%</span>
+ </div>
+ <div className="h-2 bg-muted rounded-full overflow-hidden">
+ <div
+ className={`h-full ${project.progressStatus === 'At Risk' ? 'bg-destructive' : 'bg-primary'}`}
+ style={{ width: `${Math.min(100, Math.max(0, project.completionPercentage ?? 0))}%` }}
+ />
+ </div>
+ </div>
+
+ <div className="mt-4 text-sm cb-body">
+ {project.start_date ? `Start ${new Date(project.start_date).toLocaleDateString()}` : 'Start TBD'} |{' '}
+ {project.end_date ? `End ${new Date(project.end_date).toLocaleDateString()}` : 'No end date'} |{' '}
+ <span className="font-mono">{project.required_skills?.length || 0}</span> skill requirements
  </div>
  </button>
  ))}
@@ -241,4 +271,3 @@ const HRProjects: React.FC = () => {
 };
 
 export default HRProjects;
-

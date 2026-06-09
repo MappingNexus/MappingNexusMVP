@@ -63,6 +63,8 @@ export interface Employee {
     hasCv?: boolean;
     cvFileName?: string | null;
     cvUploadedAt?: string | null;
+    resumeUrl?: string | null;
+    resumePath?: string | null;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -164,6 +166,12 @@ export interface Project {
     start_date?: string;
     end_date?: string;
     status: 'planned' | 'active' | 'completed';
+    requiredEmployees?: number;
+    assignedEmployees?: number;
+    completionPercentage?: number;
+    progressStatus?: 'Not Started' | 'In Progress' | 'At Risk' | 'Completed';
+    manager?: string | null;
+    managerEmail?: string | null;
     created_at: string;
     updated_at: string;
 }

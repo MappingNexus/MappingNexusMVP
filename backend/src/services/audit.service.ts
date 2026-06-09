@@ -22,6 +22,7 @@ export const AuditActions = {
     EMPLOYEE_CREATED: 'employee_created',
     EMPLOYEE_EDITED: 'employee_edited',
     EMPLOYEE_ARCHIVED: 'employee_archived',
+    RESUME_UPLOADED: 'resume_uploaded',
 
     // Team management
     TEAM_CREATED: 'team_created',
@@ -36,6 +37,10 @@ export const AuditActions = {
     ASSIGNMENT_CREATED: 'assignment_created',
     ASSIGNMENT_REMOVED: 'assignment_removed',
     CAPACITY_RECALCULATED: 'capacity_recalculated',
+
+    // Projects
+    PROJECT_CREATED: 'project_created',
+    PROJECT_UPDATED: 'project_updated',
 
     // Matching
     MATCH_QUERY_EXECUTED: 'match_query_executed',
@@ -148,13 +153,13 @@ function sanitizeMetadata(meta: Record<string, any>): Record<string, any> {
     const ALLOWED_KEYS = new Set([
         'department', 'seniorityLevel', 'seniority_level',
         'teamId', 'team_id', 'teamName', 'team_name',
-        'role', 'action', 'count', 'filename',
+        'role', 'action', 'count', 'filename', 'fileName',
         'managerId', 'manager_id',
         'status', 'previousStatus', 'reason', 'note',
         'revokedSessions', 'currentSessionRevoked',
         'previousRole', 'newRole',
         'skillsRequested', 'matchCount', 'filtersApplied',
-        'assignmentId', 'projectId',
+        'assignmentId', 'projectId', 'projectName', 'requiredEmployees',
         'candidatesScanned', 'topMatchScore', 'aiEnhanced', 'searchMethod',
         'endpoint', 'severity', 'method', 'requiredRoles', 'attemptedEndpoint',
         'attemptedCompanyId',

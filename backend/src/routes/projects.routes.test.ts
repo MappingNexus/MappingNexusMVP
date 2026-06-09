@@ -130,6 +130,12 @@ jest.unstable_mockModule('../config/supabase.js', () => ({
     },
 }));
 
+jest.unstable_mockModule('../config/db.js', () => ({
+    pool: {
+        query: jest.fn(async () => ({ rows: [] })),
+    },
+}));
+
 jest.unstable_mockModule('../middleware/auth.js', () => ({
     requireAuth: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
         (req as express.Request & { user?: TestUser }).user = currentUser;

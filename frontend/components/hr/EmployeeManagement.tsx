@@ -133,7 +133,7 @@ const EmployeeManagement: React.FC = () => {
  <table className="cb-table">
  <thead>
  <tr>
- {['Name', 'Department', 'Seniority', 'Location', 'Skills', 'CV', 'Assigned Project', 'Load', 'Performance', 'Actions'].map(h => (
+ {['Name', 'Department', 'Seniority', 'Location', 'Skills', 'Resume', 'Assigned Project', 'Load', 'Performance', 'Actions'].map(h => (
  <th key={h}>{h}</th>
  ))}
  </tr>
@@ -158,19 +158,32 @@ const EmployeeManagement: React.FC = () => {
  </td>
  <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">
  {emp.hasCv ? (
+ <div className="flex flex-wrap gap-2">
  <button
  onClick={async () => {
  const result = await api.openEmployeeCv(emp.employeeId);
- if (!result.success) alert(result.message || 'Unable to open CV.');
+ if (!result.success) alert(result.message || 'Unable to open resume.');
  }}
- title={emp.cvFileName || 'Open CV'}
+ title={emp.cvFileName || 'View Resume'}
  className="inline-flex items-center gap-2 max-w-[180px] text-blue-500 hover:underline"
  >
  <FileText className="w-4 h-4 shrink-0" />
- <span className="truncate">Open CV</span>
+ <span className="truncate">View</span>
  </button>
+ <button
+ onClick={async () => {
+ const result = await api.downloadEmployeeCv(emp.employeeId, emp.cvFileName || 'resume.pdf');
+ if (!result.success) alert(result.message || 'Unable to download resume.');
+ }}
+ title={emp.cvFileName || 'Download Resume'}
+ className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
+ >
+ <Download className="w-4 h-4 shrink-0" />
+ <span>Download</span>
+ </button>
+ </div>
  ) : (
- <span className="text-xs text-muted-foreground">No CV</span>
+ <span className="text-xs text-muted-foreground">No Resume</span>
  )}
  </td>
  <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{employeeMetadata[emp.employeeId]?.assignedProject || 'Unassigned'}</td>
