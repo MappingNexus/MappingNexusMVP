@@ -3,7 +3,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as api from '../../../services/api';
 import type { Employee } from '../../../types';
-import { Panel, SectionHeader, StatusPill } from '../ManagerDashboardWidgets';
+import { AnalyticsEmptyState, Panel, SectionHeader, StatusPill } from '../ManagerDashboardWidgets';
 
 function buildReportRows(employees: Employee[]) {
     const groups = new Map<string, { department: string; employees: number; workload: number; performance: number; performanceCount: number; available: number }>();
@@ -81,19 +81,23 @@ const ManagerReportsAnalytics: React.FC = () => {
                 <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_0.8fr] gap-6">
                     <Panel>
                         <SectionHeader eyebrow="REPORT.CHART" title="Workload & Attendance" meta="LIVE DATA" />
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={reportRows}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-                                    <XAxis dataKey="department" tick={{ fill: '#8a8a8a', fontSize: 10 }} />
-                                    <YAxis tick={{ fill: '#8a8a8a', fontSize: 10 }} />
-                                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ background: '#0b0b0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }} />
-                                    <Bar dataKey="employees" name="Employees" fill="#3B82F6" />
-                                    <Bar dataKey="attendance" name="Attendance signal %" fill="#00FF66" />
-                                    <Bar dataKey="workload" name="Workload %" fill="#FF9900" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                        {reportRows.length === 0 ? (
+                            <AnalyticsEmptyState />
+                        ) : (
+                            <div className="h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={reportRows}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                                        <XAxis dataKey="department" tick={{ fill: '#8a8a8a', fontSize: 10 }} />
+                                        <YAxis tick={{ fill: '#8a8a8a', fontSize: 10 }} />
+                                        <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ background: '#0b0b0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }} />
+                                        <Bar dataKey="employees" name="Employees" fill="#3B82F6" />
+                                        <Bar dataKey="attendance" name="Attendance signal %" fill="#00FF66" />
+                                        <Bar dataKey="workload" name="Workload %" fill="#FF9900" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
                     </Panel>
                     <Panel>
                         <SectionHeader eyebrow="EXPORTS" title="Available Reports" meta={`${reportItems.length} LIVE`} />
@@ -111,17 +115,21 @@ const ManagerReportsAnalytics: React.FC = () => {
                     </Panel>
                     <Panel className="xl:col-span-2">
                         <SectionHeader eyebrow="PERFORMANCE.TREND" title="Department Performance" meta="LIVE DATA" />
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={reportRows}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-                                    <XAxis dataKey="department" tick={{ fill: '#8a8a8a', fontSize: 10 }} />
-                                    <YAxis tick={{ fill: '#8a8a8a', fontSize: 10 }} domain={[0, 5]} />
-                                    <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.18)' }} contentStyle={{ background: '#0b0b0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }} />
-                                    <Line type="monotone" dataKey="performance" name="Performance" stroke="#00FF66" strokeWidth={2} dot={{ r: 4 }} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
+                        {reportRows.length === 0 ? (
+                            <AnalyticsEmptyState />
+                        ) : (
+                            <div className="h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={reportRows}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                                        <XAxis dataKey="department" tick={{ fill: '#8a8a8a', fontSize: 10 }} />
+                                        <YAxis tick={{ fill: '#8a8a8a', fontSize: 10 }} domain={[0, 5]} />
+                                        <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.18)' }} contentStyle={{ background: '#0b0b0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }} />
+                                        <Line type="monotone" dataKey="performance" name="Performance" stroke="#00FF66" strokeWidth={2} dot={{ r: 4 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
                     </Panel>
                 </div>
             )}

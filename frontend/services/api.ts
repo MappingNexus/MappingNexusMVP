@@ -5,7 +5,7 @@
 import type {
     UserProfile, Session, Employee, Team, MembershipRequest,
     MatchResult, AnalyticsOverview, BurnoutData, SkillPulseData, AuditLogEntry,
-    Assignment, Project, EmployeeRequest,
+    Assignment, Project, EmployeeRequest, AdminUser,
 } from '../types';
 
 const viteEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
@@ -334,11 +334,20 @@ export async function createEmployee(data: {
     performanceScore?: number; tenureYears?: number; role?: 'employee' | 'manager';
     availabilityWindows?: { windowType: string; startDate: string; endDate: string; note?: string }[];
     requestId?: string;
+    managerId?: string;
+    projectId?: string;
     cvFileName?: string;
     cvMimeType?: string;
     cvDataBase64?: string;
 }) {
     return request('/api/employees', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function getAdminUsers(role?: 'hr' | 'manager' | 'employee') {
+    const query = new URLSearchParams();
+    if (role) query.set('role', role);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return request<{ success: boolean; users: AdminUser[]; message?: string }>(`/api/admin/users${suffix}`);
 }
 
 export async function openEmployeeCv(employeeId: string): Promise<{ success: boolean; message?: string }> {

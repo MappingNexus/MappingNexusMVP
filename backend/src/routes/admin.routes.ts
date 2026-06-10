@@ -33,6 +33,47 @@ const lifecycleActions: Record<string, { status: UserStatus; auditAction: string
     },
 };
 
+router.get('/users', requireAuth, requireRole('hr'), async (req: Request, res: Response) => {
+    const admin = (req as AuthenticatedRequest).user;
+    const role = typeof req.query.role === 'string' ? req.query.role : undefined;
+
+    try {
+        const params: any[] = [admin.companyId];
+        let roleClause = '';
+
+        if (role) {
+            if (!['hr', 'manager', 'employee'].includes(role)) {
+                return res.status(400).json({ success: false, message: 'Invalid role filter.' });
+            }
+            params.push(role);
+            roleClause = `AND role = $${params.length}`;
+        }
+
+        const result = await pool.query(
+            `SELECT user_id, email, role, status, created_at
+             FROM public.users
+             WHERE company_id = $1
+               ${roleClause}
+             ORDER BY created_at DESC`,
+            params
+        );
+
+        return res.json({
+            success: true,
+            users: result.rows.map(row => ({
+                userId: row.user_id,
+                email: row.email,
+                role: row.role,
+                status: row.status,
+                createdAt: row.created_at,
+            })),
+        });
+    } catch (err: any) {
+        console.error('List admin users error:', err.message);
+        return res.status(500).json({ success: false, message: 'Failed to fetch users.' });
+    }
+});
+
 async function updateUserLifecycleStatus(req: Request, res: Response, action: keyof typeof lifecycleActions) {
     const admin = (req as AuthenticatedRequest).user;
     const targetUserId = req.params.id;

@@ -50,6 +50,16 @@ export function Panel({ children, className = '' }: { children: React.ReactNode;
     );
 }
 
+export function AnalyticsEmptyState() {
+    return (
+        <div className="min-h-[18rem] flex items-center justify-center border border-dashed border-gray-200 dark:border-white/10 bg-white/30 dark:bg-black/20 px-6 text-center">
+            <p className="max-w-md text-sm text-gray-500 dark:text-[#8a8a8a]">
+                No data available yet. Add employees or projects to generate analytics.
+            </p>
+        </div>
+    );
+}
+
 export function StatusPill({ label, tone = 'neutral' }: { label: string; tone?: 'green' | 'yellow' | 'red' | 'blue' | 'neutral' }) {
     const className = {
         green: 'border-blue-500 dark:border-[#00FF66]/40 text-blue-500 dark:text-[#00FF66] bg-blue-50 dark:bg-[#00FF66]/5',

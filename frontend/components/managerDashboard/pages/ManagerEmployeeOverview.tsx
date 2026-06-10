@@ -85,8 +85,10 @@ const ManagerEmployeeOverview: React.FC = () => {
                             <thead>
                                 <tr className="border-b border-gray-200 dark:border-white/10 text-[10px] font-mono uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a]">
                                     <th className="py-3 pr-4">Employee Name</th>
+                                    <th className="py-3 pr-4">Email</th>
                                     <th className="py-3 pr-4">Role</th>
                                     <th className="py-3 pr-4">Department</th>
+                                    <th className="py-3 pr-4">Assigned Project</th>
                                     <th className="py-3 pr-4">Performance</th>
                                     <th className="py-3 pr-4">Status</th>
                                     <th className="py-3 pr-4">Resume</th>
@@ -103,10 +105,12 @@ const ManagerEmployeeOverview: React.FC = () => {
                                                 <p className="font-bold text-gray-900 dark:text-white">{employee.name || `Employee ${employee.displayId}`}</p>
                                                 <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-gray-500 dark:text-[#8a8a8a]">{employee.displayId}</p>
                                             </td>
-                                            <td className="py-4 pr-4 text-gray-600 dark:text-[#cfcfcf]">{formatSeniority(employee.seniorityLevel)}</td>
+                                            <td className="py-4 pr-4 text-gray-600 dark:text-[#cfcfcf]">{employee.workEmail || 'Not available'}</td>
+                                            <td className="py-4 pr-4 text-gray-600 dark:text-[#cfcfcf]">{employee.role || formatSeniority(employee.seniorityLevel)}</td>
                                             <td className="py-4 pr-4 text-gray-600 dark:text-[#cfcfcf]">{employee.department}</td>
+                                            <td className="py-4 pr-4 text-gray-600 dark:text-[#cfcfcf]">{employee.assignedProject || 'Unassigned'}</td>
                                             <td className="py-4 pr-4 font-mono text-blue-500 dark:text-[#00FF66]">
-                                                {employee.performanceScore !== undefined ? `${employee.performanceScore.toFixed(1)}` : 'N/A'}
+                                                {employee.performanceScore !== undefined ? `${employee.performanceScore.toFixed(1)}` : 'Not available'}
                                             </td>
                                             <td className="py-4 pr-4"><StatusPill label={status.label} tone={status.tone} /></td>
                                             <td className="py-4 pr-4">
@@ -149,7 +153,7 @@ const ManagerEmployeeOverview: React.FC = () => {
                                 })}
                                 {employees.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="py-12 text-center">
+                                        <td colSpan={9} className="py-12 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-[#8a8a8a]">
                                                 <RefreshCw className="h-5 w-5" />
                                                 <p className="font-mono text-xs uppercase tracking-widest">No employees found</p>

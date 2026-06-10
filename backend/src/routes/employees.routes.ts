@@ -78,6 +78,8 @@ const createEmployeeSchema = z.object({
     tenureYears: z.coerce.number().min(0).max(50).optional().nullable(),
     role: z.enum(['employee', 'manager']).optional(),
     requestId: z.string().uuid().optional(),
+    managerId: z.string().uuid().optional().nullable(),
+    projectId: z.string().uuid().optional().nullable(),
     cvFileName: z.string().trim().min(1).max(180).optional(),
     cvMimeType: z.string().trim().max(120).optional(),
     cvDataBase64: z.string().optional(),
@@ -321,6 +323,116 @@ async function mergeExtractedSkills(employeeId: string, companyId: string, extra
     await enqueueEmbeddingJob(employeeId, uniqueSkills.join(', '));
 }
 
+async function getOrCreateManagerTeam(companyId: string, managerId: string) {
+    const managerResult = await pool.query(
+        `SELECT user_id, email
+         FROM public.users
+         WHERE user_id = $1
+           AND company_id = $2
+           AND role = 'manager'
+           AND status = 'active'`,
+        [managerId, companyId]
+    );
+
+    if (managerResult.rowCount === 0) {
+        throw new Error('Selected manager was not found in this company.');
+    }
+
+    const teamResult = await pool.query(
+        `SELECT team_id
+         FROM public.teams
+         WHERE company_id = $1
+           AND manager_id = $2
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [companyId, managerId]
+    );
+
+    if ((teamResult.rowCount ?? 0) > 0) return teamResult.rows[0].team_id;
+
+    const created = await pool.query(
+        `INSERT INTO public.teams (company_id, manager_id, team_name)
+         VALUES ($1, $2, $3)
+         RETURNING team_id`,
+        [companyId, managerId, `${managerResult.rows[0].email} Team`]
+    );
+
+    return created.rows[0].team_id;
+}
+
+async function attachEmployeeToManagerAndProject(params: {
+    companyId: string;
+    employeeId: string;
+    managerId?: string | null;
+    projectId?: string | null;
+    actorId: string;
+}) {
+    const { companyId, employeeId, managerId, projectId, actorId } = params;
+
+    if (managerId) {
+        const teamId = await getOrCreateManagerTeam(companyId, managerId);
+        await pool.query(
+            `INSERT INTO public.team_memberships
+                (team_id, employee_id, company_id, status, requested_by, reviewed_by, review_note, reviewed_at)
+             VALUES ($1, $2, $3, 'approved', $4, $4, 'Assigned during HR employee creation.', now())
+             ON CONFLICT (team_id, employee_id)
+             WHERE status IN ('pending', 'approved')
+             DO UPDATE SET
+                status = 'approved',
+                reviewed_by = EXCLUDED.reviewed_by,
+                review_note = EXCLUDED.review_note,
+                reviewed_at = now()`,
+            [teamId, employeeId, companyId, actorId]
+        );
+    }
+
+    if (projectId) {
+        const projectResult = await pool.query(
+            `SELECT project_id
+             FROM public.projects
+             WHERE project_id = $1
+               AND company_id = $2`,
+            [projectId, companyId]
+        );
+
+        if (projectResult.rowCount === 0) {
+            throw new Error('Selected project was not found in this company.');
+        }
+
+        await pool.query(
+            `INSERT INTO public.assignments
+                (employee_id, project_id, company_id, assigned_by, start_date)
+             SELECT $1, $2, $3, $4, CURRENT_DATE
+             WHERE NOT EXISTS (
+                SELECT 1
+                FROM public.assignments
+                WHERE employee_id = $1
+                  AND project_id = $2
+                  AND company_id = $3
+             )`,
+            [employeeId, projectId, companyId, actorId]
+        );
+
+        await pool.query(
+            `UPDATE public.employees e
+             SET current_project_load = assignment_counts.assignment_count,
+                 capacity_committed_pct = LEAST(100, assignment_counts.assignment_count * 25),
+                 last_assignment_date = CURRENT_DATE,
+                 updated_at = now()
+             FROM (
+                SELECT employee_id, COUNT(*)::int AS assignment_count
+                FROM public.assignments
+                WHERE employee_id = $1
+                  AND company_id = $2
+                GROUP BY employee_id
+             ) assignment_counts
+             WHERE e.employee_id = assignment_counts.employee_id
+               AND e.company_id = $2`,
+            [employeeId, companyId]
+        );
+    }
+}
+
 async function upsertEmployeeCv(params: {
     employeeId: string;
     companyId: string;
@@ -390,6 +502,46 @@ async function formatEmployeeResponse(
     );
     const cv = cvResult.rows[0];
 
+    const assignmentResult = await pool.query(
+        `SELECT p.project_id, p.project_name
+         FROM public.assignments a
+         JOIN public.projects p
+           ON p.project_id = a.project_id
+          AND p.company_id = a.company_id
+         WHERE a.employee_id = $1
+           AND a.company_id = $2
+         ORDER BY a.created_at DESC
+         LIMIT 1`,
+        [emp.employee_id, companyId]
+    );
+    const assignment = assignmentResult.rows[0];
+
+    const managerResult = await pool.query(
+        `SELECT u.user_id, u.email
+         FROM public.team_memberships tm
+         JOIN public.teams t
+           ON t.team_id = tm.team_id
+          AND t.company_id = tm.company_id
+         JOIN public.users u
+           ON u.user_id = t.manager_id
+          AND u.company_id = t.company_id
+         WHERE tm.employee_id = $1
+           AND tm.company_id = $2
+           AND tm.status = 'approved'
+         ORDER BY tm.reviewed_at DESC NULLS LAST, tm.created_at DESC
+         LIMIT 1`,
+        [emp.employee_id, companyId]
+    );
+    const manager = managerResult.rows[0];
+
+    const userResult = emp.user_id
+        ? await pool.query(
+            'SELECT role FROM public.users WHERE user_id = $1 AND company_id = $2',
+            [emp.user_id, companyId]
+        )
+        : { rows: [] as any[] };
+    const userRole = userResult.rows[0]?.role || 'employee';
+
     const displayId = hashForDisplay(emp.employee_id);
 
     const response: any = {
@@ -397,6 +549,7 @@ async function formatEmployeeResponse(
         displayId,
         name: decrypted.name || `Employee ${displayId}`,
         workEmail: decrypted.workEmail,
+        role: userRole,
         department: emp.department,
         seniorityLevel: emp.seniority_level,
         location: emp.location,
@@ -414,6 +567,10 @@ async function formatEmployeeResponse(
         cvUploadedAt: cv?.uploaded_at || null,
         resumeUrl: cv ? `/api/employees/${emp.employee_id}/cv` : null,
         resumePath: cv ? `/api/employees/${emp.employee_id}/cv` : null,
+        assignedProjectId: assignment?.project_id || null,
+        assignedProject: assignment?.project_name || null,
+        managerId: manager?.user_id || null,
+        managerEmail: manager?.email || null,
         availabilityWindows: (windows || []).map(window => ({
             availabilityWindowId: window.availability_window_id,
             windowType: window.window_type,
@@ -464,6 +621,7 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
             name, workEmail, department, seniorityLevel, costPerDay,
             location, travelEligible, skills, performanceScore,
             availabilityFrom, availabilityTo, availabilityWindows, tenureYears, role: targetRole, requestId,
+            managerId, projectId,
             cvFileName, cvMimeType, cvDataBase64,
         } = req.body;
 
@@ -625,6 +783,23 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
 
         await syncAvailabilityWindows(db, employee.employee_id, user.companyId, user.userId, availabilityWindows);
 
+        try {
+            await attachEmployeeToManagerAndProject({
+                companyId: user.companyId,
+                employeeId: employee.employee_id,
+                managerId,
+                projectId,
+                actorId: user.userId,
+            });
+        } catch (assignmentError: any) {
+            await db.from('employees').delete().eq('employee_id', employee.employee_id).eq('company_id', user.companyId);
+            await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+            return res.status(400).json({
+                success: false,
+                message: assignmentError.message || 'Failed to assign employee to manager or project.',
+            });
+        }
+
         if (cvFileName && cvMimeType && cvDataBase64) {
             await upsertEmployeeCv({
                 employeeId: employee.employee_id,
@@ -672,7 +847,7 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
             action: AuditActions.EMPLOYEE_CREATED,
             targetId: employee.employee_id,
             companyId: user.companyId,
-            metadata: { department, seniorityLevel: seniorityLevel || 'mid' }
+            metadata: { department, seniorityLevel: seniorityLevel || 'mid', managerId, projectId }
         });
 
         res.status(201).json({
@@ -684,6 +859,8 @@ router.post('/', requireAuth, requireRole('hr'), validate(createEmployeeSchema),
                 department,
                 hasCv: Boolean(cvFileName && cvMimeType && cvDataBase64),
                 resumeUrl: cvFileName ? `/api/employees/${employee.employee_id}/cv` : null,
+                managerId: managerId || null,
+                assignedProjectId: projectId || null,
             },
             onboarding: emailResult,
         });

@@ -5,7 +5,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Archive, Search, X, Loader2, Upload, Download, FileText } from 'lucide-react';
 import * as api from '../../services/api';
-import type { Employee, EmployeeRequest, Project } from '../../types';
+import type { AdminUser, Employee, EmployeeRequest, Project } from '../../types';
 import LoadingSpinner from '../shared/LoadingSpinner';
 
 const SENIORITY_LEVELS = ['junior', 'mid', 'senior', 'lead', 'principal'];
@@ -133,7 +133,7 @@ const EmployeeManagement: React.FC = () => {
  <table className="cb-table">
  <thead>
  <tr>
- {['Name', 'Department', 'Seniority', 'Location', 'Skills', 'Resume', 'Assigned Project', 'Load', 'Performance', 'Actions'].map(h => (
+ {['Name', 'Email', 'Department', 'Role', 'Skills', 'Resume', 'Project', 'Manager', 'Created', 'Actions'].map(h => (
  <th key={h}>{h}</th>
  ))}
  </tr>
@@ -145,9 +145,9 @@ const EmployeeManagement: React.FC = () => {
  <p className="text-sm font-medium text-foreground dark:text-white">{emp.name || `Employee ${emp.displayId}`}</p>
  <p className="text-xs text-muted-foreground font-mono">{emp.displayId}</p>
  </td>
+ <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.workEmail || 'Not available'}</td>
  <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.department}</td>
- <td className="px-5 py-3"><span className="border border-[#9D4EDD]/30 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-[#9D4EDD] bg-[#9D4EDD]/10 capitalize">{emp.seniorityLevel}</span></td>
- <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.location}</td>
+ <td className="px-5 py-3"><span className="border border-[#9D4EDD]/30 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-[#9D4EDD] bg-[#9D4EDD]/10 capitalize">{emp.role || 'employee'}</span></td>
  <td className="px-5 py-3 min-w-[180px]">
  <div className="flex flex-wrap gap-1.5">
  {(emp.skills?.length ? emp.skills.map(skill => skill.skill_name || skill.name).filter(Boolean) : (employeeMetadata[emp.employeeId]?.skillsSummary || '').split(',').map(skill => skill.trim()).filter(Boolean)).slice(0, 4).map(skill => (
@@ -186,13 +186,9 @@ const EmployeeManagement: React.FC = () => {
  <span className="text-xs text-muted-foreground">No Resume</span>
  )}
  </td>
- <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{employeeMetadata[emp.employeeId]?.assignedProject || 'Unassigned'}</td>
- <td className="px-5 py-3">
- <span className={`text-sm font-medium font-mono ${emp.currentProjectLoad >= 4 ? 'text-[#FF3333]' : emp.currentProjectLoad >= 2 ? 'text-[#FF9900]' : 'text-blue-500 dark:text-[#00FF66]'}`}>
- {emp.currentProjectLoad}
- </span>
- </td>
- <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.performanceScore?.toFixed(1) ?? '—'}</td>
+ <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.assignedProject || employeeMetadata[emp.employeeId]?.assignedProject || 'Unassigned'}</td>
+ <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.managerEmail || 'Unassigned'}</td>
+ <td className="px-5 py-3 text-sm text-muted-foreground dark:text-[#8a8a8a]">{emp.createdAt ? new Date(emp.createdAt).toLocaleDateString() : 'Not available'}</td>
  <td className="px-5 py-3">
  <button onClick={() => handleArchive(emp.employeeId)} className="text-gray-500 hover:text-[#FF3333] transition-colors">
  <Archive className="w-4 h-4" />
@@ -239,10 +235,12 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  costPerDay: '',
  travelEligible: false,
  skills: (prefillRequest?.skillsRequired || []).map(skill => skill.skill_name).join(', '),
- assignedProject: '',
+ projectId: '',
+ managerId: '',
  });
  const [cvFile, setCvFile] = useState<File | null>(null);
  const [projects, setProjects] = useState<Project[]>([]);
+ const [managers, setManagers] = useState<AdminUser[]>([]);
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState('');
  const [result, setResult] = useState<any>(null);
@@ -253,6 +251,9 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  useEffect(() => {
  api.getProjects().then(res => {
  if (res.success) setProjects(res.projects || []);
+ }).catch(() => {});
+ api.getAdminUsers('manager').then(res => {
+ if (res.success) setManagers((res.users || []).filter(manager => manager.status === 'active'));
  }).catch(() => {});
  }, []);
 
@@ -282,13 +283,15 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  skills,
  role: form.role,
  requestId: prefillRequest?.requestId,
+ managerId: form.managerId || undefined,
+ projectId: form.projectId || undefined,
  ...cvPayload,
  });
  if (res.success) {
  const employeeId = res.employee?.employeeId;
  if (employeeId) {
  saveEmployeeMetadata(employeeId, {
- assignedProject: form.assignedProject,
+ assignedProject: projects.find(project => project.project_id === form.projectId)?.project_name,
  skillsSummary: form.skills,
  });
  if (cvFile && cvPayload.cvFileName && cvPayload.cvMimeType && cvPayload.cvDataBase64 && !res.employee?.hasCv) {
@@ -422,6 +425,30 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  {!isManager && (
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <div>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Manager Assignment</label>
+ <select value={form.managerId} onChange={e => setForm({ ...form, managerId: e.target.value })}
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors">
+ <option value="">Unassigned</option>
+ {managers.map(manager => (
+ <option key={manager.userId} value={manager.userId}>{manager.email}</option>
+ ))}
+ </select>
+ </div>
+ <div>
+ <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Project Assignment</label>
+ <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })}
+ className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors">
+ <option value="">Unassigned</option>
+ {projects.map(project => (
+ <option key={project.project_id} value={project.project_id}>{project.project_name}</option>
+ ))}
+ </select>
+ </div>
+ </div>
+ )}
+ {!isManager && (
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div>
  <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">CV / Resume</label>
  <input
  type="file"
@@ -431,15 +458,8 @@ function AddEmployeeModal({ onClose, onCreated, prefillRequest }: { onClose: () 
  />
  {cvFile && <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-white/60">{cvFile.name}</p>}
  </div>
- <div>
- <label className="block font-mono text-[10px] uppercase tracking-widest text-white/70 mb-2">Assign Project</label>
- <select value={form.assignedProject} onChange={e => setForm({ ...form, assignedProject: e.target.value })}
- className="w-full bg-[#11151b] border border-white/15 px-3 py-2.5 text-white text-sm outline-none focus:border-blue-500 transition-colors">
- <option value="">Unassigned</option>
- {projects.map(project => (
- <option key={project.project_id} value={project.project_name}>{project.project_name}</option>
- ))}
- </select>
+ <div className="border border-white/15 bg-[#11151b] px-3 py-2.5 text-xs font-mono uppercase tracking-widest text-white/60">
+ Resume is saved with the employee record.
  </div>
  </div>
  )}

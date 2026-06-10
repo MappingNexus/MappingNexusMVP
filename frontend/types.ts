@@ -44,6 +44,7 @@ export interface Employee {
     displayId: string;
     name: string;
     workEmail?: string;
+    role?: 'hr' | 'manager' | 'employee';
     department: string;
     seniorityLevel: string;
     location: string;
@@ -65,8 +66,20 @@ export interface Employee {
     cvUploadedAt?: string | null;
     resumeUrl?: string | null;
     resumePath?: string | null;
+    assignedProjectId?: string | null;
+    assignedProject?: string | null;
+    managerId?: string | null;
+    managerEmail?: string | null;
     createdAt?: string;
     updatedAt?: string;
+}
+
+export interface AdminUser {
+    userId: string;
+    email: string;
+    role: 'hr' | 'manager' | 'employee';
+    status: string;
+    createdAt: string;
 }
 
 export interface Team {

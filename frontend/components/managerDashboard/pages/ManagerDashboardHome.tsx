@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import * as api from '../../../services/api';
 import type { Employee } from '../../../types';
 import { liveProjects, notifications, recentActivity } from '../managerDashboardData';
-import { LoadBar, MetricCard, Panel, SectionHeader, StatusPill } from '../ManagerDashboardWidgets';
+import { AnalyticsEmptyState, LoadBar, MetricCard, Panel, SectionHeader, StatusPill } from '../ManagerDashboardWidgets';
 
 function ProgressBar({ label, value, tone }: { label: string; value: number; tone: 'discussion' | 'work' }) {
     const color = tone === 'discussion' ? '#9D4EDD' : '#00FF66';
@@ -128,19 +128,28 @@ const ManagerDashboardHome: React.FC = () => {
             <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_0.8fr] gap-6">
                 <Panel>
                     <SectionHeader eyebrow="TEAM.LIVE" title="Department Workload Signal" meta="LIVE DATA" />
-                    <div className="h-72">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
-                                <XAxis dataKey="department" tick={{ fill: '#8a8a8a', fontSize: 10 }} />
-                                <YAxis tick={{ fill: '#8a8a8a', fontSize: 10 }} />
-                                <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ background: '#0b0b0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }} />
-                                <Bar dataKey="employees" name="Employees" fill="#3B82F6" />
-                                <Bar dataKey="attendance" name="Availability %" fill="#00FF66" />
-                                <Bar dataKey="workload" name="Workload %" fill="#FF9900" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {loading ? (
+                        <div className="min-h-[18rem] flex items-center justify-center gap-3 text-gray-500 dark:text-[#8a8a8a]">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="font-mono text-xs uppercase tracking-widest">Loading analytics</span>
+                        </div>
+                    ) : chartData.length === 0 ? (
+                        <AnalyticsEmptyState />
+                    ) : (
+                        <div className="h-72">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.18)" />
+                                    <XAxis dataKey="department" tick={{ fill: '#8a8a8a', fontSize: 10 }} />
+                                    <YAxis tick={{ fill: '#8a8a8a', fontSize: 10 }} />
+                                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} contentStyle={{ background: '#0b0b0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }} />
+                                    <Bar dataKey="employees" name="Employees" fill="#3B82F6" />
+                                    <Bar dataKey="attendance" name="Availability %" fill="#00FF66" />
+                                    <Bar dataKey="workload" name="Workload %" fill="#FF9900" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
                 </Panel>
 
                 <Panel>
